@@ -1,0 +1,55 @@
+# Docker Compose for VPS deployment of Legacy Adapter
+# This file is for deploying ONLY the adapter service on your secure VPS
+
+services:
+  legacy-adapter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: linux/amd64  # Required for pymssql
+    container_name: legacy_adapter
+    restart: unless-stopped
+    environment:
+      # Legacy MSSQL connection
+      - LEGACY_DB_HOST=${LEGACY_DB_HOST}
+      - LEGACY_DB_PORT=${LEGACY_DB_PORT:-1433}
+      - LEGACY_DB_USER=${LEGACY_DB_USER}
+      - LEGACY_DB_PASSWORD=${LEGACY_DB_PASSWORD}
+      - LEGACY_DB_NAME=${LEGACY_DB_NAME}
+
+      # Security settings
+      - API_KEY=${API_KEY}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:8000}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-legacy-adapter.vps.example.com,localhost}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-60}
+
+      # Application settings
+      - DEBUG=${DEBUG:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+    ports:
+      - "8001:8000"  # Expose on port 8001 (avoid conflict with other services)
+
+    networks:
+      - legacy-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Resource limits (adjust based on your VPS resources)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+networks:
+  legacy-network:
+    driver: bridge

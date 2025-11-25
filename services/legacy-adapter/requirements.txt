@@ -1,0 +1,16 @@
+# FastAPI and web server
+fastapi==0.120.2
+uvicorn[standard]==0.38.0
+
+# Database driver - use latest version compatible with Python 3.11
+pymssql==2.3.2
+
+# Data validation and settings
+pydantic[email]==2.12.3
+pydantic-settings==2.11.0
+
+# File upload handling
+python-multipart==0.0.20
+
+# Production server
+gunicorn==23.0.0
