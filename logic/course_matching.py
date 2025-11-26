@@ -157,6 +157,7 @@ def generate_needs_matrix(students_df: pd.DataFrame, progress_callback=None):
         student_data = {
             'StudentId': student_id,
             'Name': student_name,
+            'Email': student.get('Email', ''),
             'Major': major_code,
             'Cohort': student.get('Cohort', ''),
             'LastEnroll': student['LastActiveDate']
@@ -174,7 +175,7 @@ def generate_needs_matrix(students_df: pd.DataFrame, progress_callback=None):
     
     # Fill NaNs with 0 (not needed)
     # Identify course columns (those not in metadata)
-    metadata_cols = ['StudentId', 'Name', 'Major', 'Cohort', 'LastEnroll']
+    metadata_cols = ['StudentId', 'Name', 'Email', 'Major', 'Cohort', 'LastEnroll']
     course_cols = [c for c in needs_df.columns if c not in metadata_cols]
     
     needs_df[course_cols] = needs_df[course_cols].fillna(0)

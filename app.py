@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 
 st.set_page_config(
     page_title="Academic Scheduling Tool",
@@ -43,7 +44,7 @@ def main():
 def admin_dashboard():
     st.header("Admin Dashboard")
     
-    tabs = st.tabs(["Student Selection", "Course Matching", "Schedule Optimization", "Communications"])
+    tabs = st.tabs(["Student Selection", "Course Matching", "Class Rosters", "Schedule Optimization", "Communications"])
     
     with tabs[0]:
         st.subheader("Select Active Students")
@@ -147,6 +148,7 @@ def admin_dashboard():
                         })
                 
                 demand_df = pd.DataFrame(demand_data)
+                st.session_state['demand_df'] = demand_df # Save for other tabs
                 
                 st.divider()
                 st.subheader("Course Demand & History")
@@ -175,40 +177,125 @@ def admin_dashboard():
                     
         else:
             st.warning("Please fetch students in the 'Student Selection' tab first.")
-        
+
     with tabs[2]:
-        st.subheader("Optimize Schedule")
-        st.write("Minimize conflicts and optimize class times.")
+        st.subheader("Class Rosters")
+        st.write("Create classes and assign students.")
         
         if 'needs_df' in st.session_state:
             needs_df = st.session_state['needs_df']
             
-            # Step 1: Select Courses to Offer
-            metadata_cols = ['StudentId', 'Name', 'Major', 'Cohort', 'LastEnroll']
-            all_courses = [c for c in needs_df.columns if c not in metadata_cols]
+            # Initialize rosters in session state if not present
+            if 'rosters' not in st.session_state:
+                st.session_state['rosters'] = {}
+
+            # Select Course to Create/Manage from Demand List
+            if 'demand_df' in st.session_state:
+                demand_df = st.session_state['demand_df']
+                # Sort by demand for easier selection
+                course_options = demand_df.sort_values(by='Demand', ascending=False)['Course'].tolist()
+            else:
+                metadata_cols = ['StudentId', 'Name', 'Major', 'Cohort', 'LastEnroll']
+                course_options = [c for c in needs_df.columns if c not in metadata_cols]
             
-            # Calculate demand again for sorting/display
-            course_counts = needs_df[all_courses].sum().sort_values(ascending=False)
-            top_courses = course_counts[course_counts > 0].index.tolist()
+            selected_course = st.selectbox("Select Course to Create/Manage", options=course_options)
             
-            selected_courses = st.multiselect(
-                "Select Courses to Offer (Ordered by Demand)",
-                options=top_courses,
-                default=top_courses[:5] if len(top_courses) >= 5 else top_courses
-            )
-            
-            if selected_courses:
-                st.divider()
-                st.write("### Assign Time Slots")
+            if selected_course:
+                current_roster = st.session_state['rosters'].get(selected_course, [])
+                st.info(f"Managing Roster for **{selected_course}** - Currently {len(current_roster)} students assigned.")
                 
-                from logic.optimization import TIME_SLOTS, check_conflicts
+                # Filter Eligible Students (Need the course AND not already in roster)
+                eligible_students = needs_df[needs_df[selected_course] == 1].copy()
+                
+                # Filter by Cohort
+                cohorts = sorted(eligible_students['Cohort'].unique().tolist())
+                selected_cohort = st.selectbox("Filter by Cohort", ["All"] + cohorts)
+                
+                if selected_cohort != "All":
+                    filtered_students = eligible_students[eligible_students['Cohort'] == selected_cohort]
+                else:
+                    filtered_students = eligible_students
+                
+                # Display Interactive Table
+                st.write("### Select Students to Assign")
+                st.write("Highlight rows to select students.")
+                
+                display_df = filtered_students[['StudentId', 'Name', 'Major', 'Cohort', 'Email']]
+                
+                event = st.dataframe(
+                    display_df,
+                    on_select="rerun",
+                    selection_mode="multi-row",
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                # Assign Button
+                if event.selection.rows:
+                    selected_indices = event.selection.rows
+                    selected_rows = display_df.iloc[selected_indices]
+                    
+                    if st.button(f"Assign {len(selected_rows)} Students to Roster"):
+                        # Add new students (avoid duplicates)
+                        new_students = []
+                        current_ids = [s['StudentId'] for s in current_roster]
+                        
+                        for _, row in selected_rows.iterrows():
+                            student_entry = row.to_dict()
+                            if student_entry['StudentId'] not in current_ids:
+                                new_students.append(student_entry)
+                        
+                        st.session_state['rosters'][selected_course] = current_roster + new_students
+                        st.success(f"Added {len(new_students)} students to {selected_course} roster!")
+                        st.rerun()
+                
+                # View Current Roster
+                st.divider()
+                st.write(f"### Current Roster for {selected_course} ({len(current_roster)})")
+                
+                if current_roster:
+                    roster_df = pd.DataFrame(current_roster)
+                    st.dataframe(roster_df, use_container_width=True, hide_index=True)
+                    
+                    # Remove Button (Optional - could add later)
+                    if st.button("Clear Roster", type="secondary"):
+                        st.session_state['rosters'][selected_course] = []
+                        st.rerun()
+
+                    # Export Button
+                    csv = roster_df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="Download Roster (CSV)",
+                        data=csv,
+                        file_name=f"roster_{selected_course}.csv",
+                        mime="text/csv",
+                    )
+                else:
+                    st.info("Roster is empty.")
+                    
+        else:
+            st.warning("Please generate the Needs Matrix in the 'Match Courses' tab first.")
+
+    with tabs[3]:
+        st.subheader("Optimize Schedule")
+        st.write("Assign time slots to your created classes.")
+        
+        if 'rosters' in st.session_state and st.session_state['rosters']:
+            rosters = st.session_state['rosters']
+            # Only show courses that have at least one student assigned
+            active_classes = [c for c, r in rosters.items() if len(r) > 0]
+            
+            if active_classes:
+                st.write(f"You have created **{len(active_classes)}** active classes.")
+                
+                from logic.optimization import TIME_SLOTS, check_roster_conflicts
                 
                 # Dictionary to store assigned slots
                 offered_courses = {}
                 
                 # Create a grid layout for slot assignment
                 cols = st.columns(3)
-                for i, course in enumerate(selected_courses):
+                for i, course in enumerate(active_classes):
                     with cols[i % 3]:
                         slot = st.selectbox(
                             f"Slot for {course}",
@@ -221,7 +308,7 @@ def admin_dashboard():
                 st.divider()
                 
                 if st.button("Check Conflicts", type="primary"):
-                    conflicts = check_conflicts(offered_courses, needs_df)
+                    conflicts = check_roster_conflicts(offered_courses, rosters)
                     
                     if conflicts:
                         st.error(f"Found {len(conflicts)} student conflicts!")
@@ -239,11 +326,13 @@ def admin_dashboard():
                         
                         # Save schedule to session state for next step
                         st.session_state['final_schedule'] = offered_courses
+            else:
+                st.info("You haven't added any students to rosters yet. Go to 'Class Rosters' tab.")
                         
         else:
-            st.warning("Please generate the Needs Matrix in the 'Match Courses' tab first.")
-        
-    with tabs[3]:
+            st.warning("Please create classes in the 'Class Rosters' tab first.")
+
+    with tabs[4]:
         st.subheader("Send Notifications")
         st.write("Email students and manage Telegram groups.")
         
