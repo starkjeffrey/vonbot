@@ -2,15 +2,15 @@ import pandas as pd
 import os
 from database.connection import db_cursor
 
-# Load requirements CSV
-REQUIREMENTS_FILE = "curriculum_canonical_requirements_majors_1-6.csv"
+# Load requirements CSV (simplified version with just course codes and major columns)
+REQUIREMENTS_FILE = "curriculum_requirements.csv"
 
 
 def load_requirements():
+    """Load simplified requirements CSV with columns: course_code, BAD, THM, FIN, TES, INT"""
     if os.path.exists(REQUIREMENTS_FILE):
         try:
-            # Use python engine and skip bad lines to be robust
-            return pd.read_csv(REQUIREMENTS_FILE, on_bad_lines="skip", engine="python")
+            return pd.read_csv(REQUIREMENTS_FILE)
         except Exception as e:
             print(f"Error reading requirements CSV: {e}")
             return pd.DataFrame()
@@ -32,38 +32,17 @@ def get_student_requirements(student_id: str, major_code: str):
     if requirements_df.empty:
         return []
 
-    # Map major code to major_id in CSV (This mapping needs to be defined or inferred)
-    # For now, we'll try to infer from the major code prefix (e.g., 'TES' -> 5, 'INT' -> 6, 'BAD' -> 1?)
-    # Based on CSV content:
-    # 1 -> Business? (ACCT, BUS, MGT)
-    # 3 -> Tourism (THM)
-    # 4 -> Finance (FIN)
-    # 5 -> TESOL (EDUC, ENGL)
-    # 6 -> IR (POL, IR)
-
+    # Extract major prefix from BatchIDForMaster (e.g., 'TES-53E' -> 'TES')
     major_prefix = major_code.split("-")[0] if "-" in major_code else major_code[:3]
-    major_map = {
-        "BAD": 1,  # Business Admin?
-        "THM": 3,  # Tourism
-        "FIN": 4,  # Finance
-        "TES": 5,  # TESOL
-        "INT": 6,  # International Relations
-        # Add others as needed
-    }
-
-    major_id = major_map.get(major_prefix)
-    if not major_id:
+    
+    # Validate major exists in CSV columns
+    available_majors = ['BAD', 'THM', 'FIN', 'TES', 'INT']
+    if major_prefix not in available_majors:
         return []
 
-    # Filter requirements for this major
-    major_reqs = requirements_df[requirements_df["major_id"] == major_id][
-        "name"
-    ].tolist()
-
-    # Clean up course names (remove description if present, e.g., "ACCT-300 - Cost Accounting I" -> "ACCT-300")
-    # The SQL example used 'LAW-273', 'LAW-301A'. CSV has "LAW-273 - Business Law".
-    # We need to extract the code.
-    required_codes = [req.split(" - ")[0].split(":")[0].strip() for req in major_reqs]
+    # Get courses where this major column has 'X'
+    major_reqs = requirements_df[requirements_df[major_prefix] == 'X']
+    required_codes = major_reqs['course_code'].tolist()
 
     # Check what the student has already taken (passed)
     # Using the logic from potential_class_takers.sql: grade < 'F' or (termid in ('2023T2') and grade in ('IP','I'))

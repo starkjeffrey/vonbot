@@ -7,13 +7,13 @@ name = "vonbot"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = "==3.14"
+requires-python = ">=3.13"
 dependencies = [
     "pandas>=2.3.3",
     "polars>=1.35.2",
     "pymssql>=2.3.9",
     "python-dotenv>=1.2.1",
-    "streamlit>=1.40.0",
+    "streamlit",
 ]
 
 [tool.setuptools.packages.find]
