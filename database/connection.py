@@ -22,7 +22,7 @@ class Settings:
     LEGACY_DB_HOST = os.getenv("LEGACY_DB_HOST", "96.9.90.64")
     LEGACY_DB_PORT = int(os.getenv("LEGACY_DB_PORT", 1500))
     LEGACY_DB_USER = os.getenv("LEGACY_DB_USER", "sa")
-    LEGACY_DB_PASSWORD = os.getenv("LEGACY_DB_PASSWORD", "123456")
+    LEGACY_DB_PASSWORD = os.getenv("LEGACY_DB_PASSWORD", "")
     LEGACY_DB_NAME = os.getenv("LEGACY_DB_NAME", "New_PUCDB")
 
 settings = Settings()
