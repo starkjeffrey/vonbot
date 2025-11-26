@@ -51,7 +51,11 @@ def inspect_table(table_name: str):
     for col in columns:
         col_name = col["COLUMN_NAME"]
         data_type = col["DATA_TYPE"]
-        max_length = str(col["CHARACTER_MAXIMUM_LENGTH"]) if col["CHARACTER_MAXIMUM_LENGTH"] else "N/A"
+        max_length = (
+            str(col["CHARACTER_MAXIMUM_LENGTH"])
+            if col["CHARACTER_MAXIMUM_LENGTH"]
+            else "N/A"
+        )
         nullable = col["IS_NULLABLE"]
 
         print(f"{col_name:<40} {data_type:<20} {max_length:<12} {nullable:<10}")

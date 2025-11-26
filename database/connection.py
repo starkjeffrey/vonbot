@@ -17,14 +17,17 @@ if os.path.exists(freetds_conf_path):
     os.environ["FREETDSCONF"] = freetds_conf_path
     logger.info(f"Using FREETDSCONF: {freetds_conf_path}")
 
+
 # Settings class to handle configuration
 class Settings:
     LEGACY_DB_HOST = os.getenv("LEGACY_DB_HOST")
-    LEGACY_DB_PORT = int(os.getenv("LEGACY_DB_PORT")) if os.getenv("LEGACY_DB_PORT") else None
+    LEGACY_DB_PORT = (
+        int(os.getenv("LEGACY_DB_PORT")) if os.getenv("LEGACY_DB_PORT") else None
+    )
     LEGACY_DB_USER = os.getenv("LEGACY_DB_USER")
     LEGACY_DB_PASSWORD = os.getenv("LEGACY_DB_PASSWORD")
     LEGACY_DB_NAME = os.getenv("LEGACY_DB_NAME")
-    
+
     def __post_init__(self):
         """Validate that all required environment variables are set."""
         missing = []
@@ -38,14 +41,16 @@ class Settings:
             missing.append("LEGACY_DB_PASSWORD")
         if not self.LEGACY_DB_NAME:
             missing.append("LEGACY_DB_NAME")
-        
+
         if missing:
             raise ValueError(
                 f"Missing required environment variables: {', '.join(missing)}. "
                 "Please ensure they are set in your .env file."
             )
 
+
 settings = Settings()
+
 
 def get_db_connection():
     """
@@ -53,7 +58,9 @@ def get_db_connection():
     Uses settings compatible with MSSQL 2012 (TDS 7.3, no encryption).
     """
     try:
-        logger.debug(f"Connecting to {settings.LEGACY_DB_HOST}:{settings.LEGACY_DB_PORT}")
+        logger.debug(
+            f"Connecting to {settings.LEGACY_DB_HOST}:{settings.LEGACY_DB_PORT}"
+        )
         conn = pymssql.connect(
             server=f"{settings.LEGACY_DB_HOST}:{settings.LEGACY_DB_PORT}",
             user=settings.LEGACY_DB_USER,
@@ -69,6 +76,7 @@ def get_db_connection():
     except pymssql.Error as e:
         logger.error(f"Database connection failed: {e}")
         raise
+
 
 @contextmanager
 def db_cursor():

@@ -354,7 +354,9 @@ class TestAuditEventTypes:
         ]
 
         for event_name in expected_events:
-            assert hasattr(AuditEventType, event_name), f"Missing event type: {event_name}"
+            assert hasattr(AuditEventType, event_name), (
+                f"Missing event type: {event_name}"
+            )
 
     def test_outcome_types(self):
         """Test that all outcome types are defined."""

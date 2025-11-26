@@ -28,7 +28,9 @@ class StudentCreateRequest(BaseModel):
 
     # StudentProfile fields
     is_monk: bool = False
-    preferred_study_time: str | None = Field(None, pattern="^(morning|afternoon|evening)$")
+    preferred_study_time: str | None = Field(
+        None, pattern="^(morning|afternoon|evening)$"
+    )
     is_transfer_student: bool = False
     status: str = "ACTIVE"
     enrollment_date: date | None = None
@@ -63,7 +65,9 @@ class StudentCreateResponse(BaseModel):
 
     success: bool
     student_id: int
-    legacy_student_id: int | None = Field(None, description="Legacy database primary key (IDENTITY column)")
+    legacy_student_id: int | None = Field(
+        None, description="Legacy database primary key (IDENTITY column)"
+    )
     message: str
 
 

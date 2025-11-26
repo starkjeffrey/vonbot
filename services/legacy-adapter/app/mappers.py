@@ -111,7 +111,9 @@ def django_student_to_legacy(django_student: StudentCreateRequest) -> dict[str, 
         # Student-specific attributes
         "IsMonk": django_student.is_monk,
         "PreferredStudyTime": (
-            study_time_map.get(django_student.preferred_study_time) if django_student.preferred_study_time else None
+            study_time_map.get(django_student.preferred_study_time)
+            if django_student.preferred_study_time
+            else None
         ),
         "IsTransferStudent": django_student.is_transfer_student,
     }
@@ -189,6 +191,8 @@ def legacy_student_to_django(legacy_record: dict[str, Any]) -> dict[str, Any]:
         "enrollment_date": legacy_record.get("EnrollmentDate"),
         "status": status_reverse_map.get(status_value, "UNKNOWN"),
         "is_monk": is_monk,  # Extracted from Gender="Monk" or IsMonk field
-        "preferred_study_time": study_time_reverse_map.get(legacy_record.get("PreferredStudyTime")),
+        "preferred_study_time": study_time_reverse_map.get(
+            legacy_record.get("PreferredStudyTime")
+        ),
         "is_transfer_student": legacy_record.get("IsTransferStudent", False),
     }

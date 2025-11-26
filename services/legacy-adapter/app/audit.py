@@ -71,27 +71,41 @@ class AuditEvent(BaseModel):
     # Event identification
     event_id: str = Field(..., description="Unique event identifier (UUID)")
     event_type: AuditEventType = Field(..., description="Type of event")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="UTC timestamp")
+    timestamp: datetime = Field(
+        default_factory=datetime.utcnow, description="UTC timestamp"
+    )
 
     # Actor context (who)
-    api_key_fingerprint: str | None = Field(None, description="SHA256 fingerprint of API key (first 16 chars)")
+    api_key_fingerprint: str | None = Field(
+        None, description="SHA256 fingerprint of API key (first 16 chars)"
+    )
     client_ip: str | None = Field(None, description="Client IP address")
     user_agent: str | None = Field(None, description="HTTP User-Agent header")
 
     # Operation context (what)
-    entity_type: str | None = Field(None, description="Type of entity (student, course, etc.)")
+    entity_type: str | None = Field(
+        None, description="Type of entity (student, course, etc.)"
+    )
     entity_id: int | None = Field(None, description="ID of affected entity")
-    operation: str | None = Field(None, description="Operation performed (create, read, update, delete)")
+    operation: str | None = Field(
+        None, description="Operation performed (create, read, update, delete)"
+    )
 
     # Outcome context (result)
     outcome: AuditOutcome = Field(..., description="Operation outcome")
-    outcome_reason: str | None = Field(None, description="Reason for failure or additional context")
+    outcome_reason: str | None = Field(
+        None, description="Reason for failure or additional context"
+    )
 
     # Performance context
-    duration_ms: float | None = Field(None, description="Operation duration in milliseconds")
+    duration_ms: float | None = Field(
+        None, description="Operation duration in milliseconds"
+    )
 
     # Additional context
-    metadata: dict[str, Any] | None = Field(None, description="Additional event-specific data")
+    metadata: dict[str, Any] | None = Field(
+        None, description="Additional event-specific data"
+    )
 
     def to_json(self) -> str:
         """Serialize audit event to JSON string.
@@ -199,7 +213,9 @@ class AuditLogger:
             outcome=AuditOutcome.SUCCESS if success else AuditOutcome.FAILURE,
             outcome_reason=reason,
             duration_ms=duration_ms,
-            metadata={"legacy_student_id": legacy_student_id} if legacy_student_id else None,
+            metadata={"legacy_student_id": legacy_student_id}
+            if legacy_student_id
+            else None,
         )
         self.log_event(event)
 
@@ -283,7 +299,9 @@ class AuditLogger:
         event = AuditEvent(
             event_id=self._generate_event_id(),
             event_type=AuditEventType.AUTH_FAILURE,
-            api_key_fingerprint=self._fingerprint_api_key(api_key_provided) if api_key_provided else None,
+            api_key_fingerprint=self._fingerprint_api_key(api_key_provided)
+            if api_key_provided
+            else None,
             client_ip=client_ip,
             entity_type=None,
             entity_id=None,

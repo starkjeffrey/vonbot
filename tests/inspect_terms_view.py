@@ -1,5 +1,6 @@
 from database.connection import db_cursor
 
+
 def inspect_data():
     print("--- Inspecting vw_BAlatestgrade Students ---")
     query = """
@@ -21,6 +22,7 @@ def inspect_data():
                 print("No students in view have Major data!")
     except Exception as e:
         print(f"Error inspecting view students: {e}")
+
 
 if __name__ == "__main__":
     inspect_data()

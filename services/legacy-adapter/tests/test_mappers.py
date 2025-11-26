@@ -146,7 +146,9 @@ class TestDjangoToLegacyMapping:
                 status=django_status,
             )
             result = django_student_to_legacy(request)
-            assert result["Status"] == expected_legacy, f"Failed for status: {django_status}"
+            assert result["Status"] == expected_legacy, (
+                f"Failed for status: {django_status}"
+            )
 
     def test_study_time_mapping(self):
         """Test study time preference mapping."""
@@ -268,7 +270,9 @@ class TestLegacyToDjangoMapping:
                 "IsMonk": False,
             }
             result = legacy_student_to_django(legacy_record)
-            assert result["status"] == expected_django, f"Failed for status: {legacy_status}"
+            assert result["status"] == expected_django, (
+                f"Failed for status: {legacy_status}"
+            )
 
     def test_missing_optional_fields(self):
         """Test handling of missing optional fields in legacy record."""
@@ -327,7 +331,9 @@ class TestRoundTripMapping:
         assert django_data["gender"] == original_request.gender
         assert django_data["status"] == original_request.status
         assert django_data["is_monk"] == original_request.is_monk
-        assert django_data["preferred_study_time"] == original_request.preferred_study_time
+        assert (
+            django_data["preferred_study_time"] == original_request.preferred_study_time
+        )
 
     def test_roundtrip_monk_student(self):
         """Test monk student roundtrip mapping."""

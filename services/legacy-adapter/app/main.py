@@ -62,7 +62,9 @@ def check_rate_limit(ip: str, limit: int = 60) -> bool:
     cutoff = now - timedelta(minutes=1)
 
     # Clean old requests
-    rate_limit_store[ip] = [req_time for req_time in rate_limit_store[ip] if req_time > cutoff]
+    rate_limit_store[ip] = [
+        req_time for req_time in rate_limit_store[ip] if req_time > cutoff
+    ]
 
     # Check limit
     if len(rate_limit_store[ip]) >= limit:
@@ -113,7 +115,9 @@ app.add_middleware(
 
 # Trusted host middleware (only in production)
 if not settings.DEBUG:
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS.split(","))
+    app.add_middleware(
+        TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS.split(",")
+    )
 
 
 async def verify_api_key(x_api_key: str = Header(None)):
@@ -127,11 +131,17 @@ async def verify_api_key(x_api_key: str = Header(None)):
     """
     if not x_api_key:
         logger.warning("⚠️  Request without API key from %s", "unknown")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key required")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="API key required"
+        )
 
     if x_api_key != settings.API_KEY:
-        logger.warning("⚠️  Invalid API key attempt: %s...", x_api_key[:10] if x_api_key else "None")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+        logger.warning(
+            "⚠️  Invalid API key attempt: %s...", x_api_key[:10] if x_api_key else "None"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key"
+        )
 
 
 @app.middleware("http")
@@ -272,7 +282,9 @@ async def update_student(student_id: str, request: StudentUpdateRequest) -> dict
 
         # Build UPDATE query
         set_clause = ", ".join(f"{field} = %s" for field in updates.keys())
-        update_sql = f"UPDATE Students SET {set_clause}, ModifiedDate = GETDATE() WHERE ID = %s"
+        update_sql = (
+            f"UPDATE Students SET {set_clause}, ModifiedDate = GETDATE() WHERE ID = %s"
+        )
 
         # Execute update
         cursor.execute(update_sql, (*updates.values(), student_id))
@@ -282,7 +294,11 @@ async def update_student(student_id: str, request: StudentUpdateRequest) -> dict
         cursor.close()
         conn.close()
 
-        logger.info("✅ Student updated: student_id=%s, fields=%s", student_id, list(updates.keys()))
+        logger.info(
+            "✅ Student updated: student_id=%s, fields=%s",
+            student_id,
+            list(updates.keys()),
+        )
 
         return {
             "success": True,
@@ -548,7 +564,9 @@ async def delete_student(student_id: str) -> dict:
         conn.close()
 
         if rows_affected == 0:
-            logger.warning("⚠️  Student not found for deletion: student_id=%s", student_id)
+            logger.warning(
+                "⚠️  Student not found for deletion: student_id=%s", student_id
+            )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Student with student_id {student_id} not found",
@@ -607,7 +625,9 @@ async def get_enrollments(
         GET /enrollments?term=251027E-T4BE&course=EHSS-02
         GET /enrollments?student=18405
     """
-    logger.info("🔍 Fetching enrollments: term=%s, course=%s, student=%s", term, course, student)
+    logger.info(
+        "🔍 Fetching enrollments: term=%s, course=%s, student=%s", term, course, student
+    )
 
     # Require at least one filter for performance
     if not any([term, course, student]):

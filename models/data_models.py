@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List
 from datetime import datetime
+
 
 @dataclass
 class Student:
@@ -9,11 +10,13 @@ class Student:
     last_name: str
     major: str
 
+
 @dataclass
 class Course:
     course_id: str
     course_name: str
     credits: int
+
 
 @dataclass
 class Recommendation:

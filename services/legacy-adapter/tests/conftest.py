@@ -192,7 +192,13 @@ def sample_legacy_monk_record():
 # Pytest configuration
 def pytest_configure(config):
     """Configure pytest markers."""
-    config.addinivalue_line("markers", "unit: Unit tests (fast, no external dependencies)")
-    config.addinivalue_line("markers", "integration: Integration tests (require mocked database)")
+    config.addinivalue_line(
+        "markers", "unit: Unit tests (fast, no external dependencies)"
+    )
+    config.addinivalue_line(
+        "markers", "integration: Integration tests (require mocked database)"
+    )
     config.addinivalue_line("markers", "security: Security-focused tests")
-    config.addinivalue_line("markers", "contract: Contract tests for legacy schema compatibility")
+    config.addinivalue_line(
+        "markers", "contract: Contract tests for legacy schema compatibility"
+    )

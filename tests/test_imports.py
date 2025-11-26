@@ -2,7 +2,8 @@ import sys
 import os
 
 # Add project root to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 
 def test_imports():
     try:
@@ -15,6 +16,7 @@ def test_imports():
         import services.telegram_bot
         import services.email_service
         import models.data_models
+
         print("✅ All modules imported successfully.")
     except ImportError as e:
         print(f"❌ Import failed: {e}")
@@ -22,6 +24,7 @@ def test_imports():
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     test_imports()

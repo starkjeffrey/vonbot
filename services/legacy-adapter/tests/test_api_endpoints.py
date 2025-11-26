@@ -57,7 +57,9 @@ class TestHealthEndpoint:
 class TestStudentCreation:
     """Test POST /students endpoint."""
 
-    def test_create_student_success(self, client, auth_headers, mock_db_connection, sample_student_request):
+    def test_create_student_success(
+        self, client, auth_headers, mock_db_connection, sample_student_request
+    ):
         """Test successful student creation."""
         # Configure mock to return no existing student, then successful insert
         mock_cursor = mock_db_connection.cursor.return_value
@@ -66,7 +68,9 @@ class TestStudentCreation:
             [999],  # SELECT @@IDENTITY - return generated ID
         ]
 
-        response = client.post("/students", json=sample_student_request, headers=auth_headers)
+        response = client.post(
+            "/students", json=sample_student_request, headers=auth_headers
+        )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -88,19 +92,27 @@ class TestStudentCreation:
         data = response.json()
         assert "api key" in data["detail"].lower()
 
-    def test_create_student_invalid_api_key(self, client, invalid_auth_headers, sample_student_request):
+    def test_create_student_invalid_api_key(
+        self, client, invalid_auth_headers, sample_student_request
+    ):
         """Test student creation fails with invalid API key."""
-        response = client.post("/students", json=sample_student_request, headers=invalid_auth_headers)
+        response = client.post(
+            "/students", json=sample_student_request, headers=invalid_auth_headers
+        )
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_create_student_duplicate(self, client, auth_headers, mock_db_connection, sample_student_request):
+    def test_create_student_duplicate(
+        self, client, auth_headers, mock_db_connection, sample_student_request
+    ):
         """Test creating duplicate student returns 409 conflict."""
         # Configure mock to return existing student
         mock_cursor = mock_db_connection.cursor.return_value
         mock_cursor.fetchone.return_value = [999]  # Existing StudentID
 
-        response = client.post("/students", json=sample_student_request, headers=auth_headers)
+        response = client.post(
+            "/students", json=sample_student_request, headers=auth_headers
+        )
 
         assert response.status_code == status.HTTP_409_CONFLICT
         data = response.json()
@@ -130,16 +142,22 @@ class TestStudentCreation:
             # Missing: first_name, last_name, date_of_birth, gender
         }
 
-        response = client.post("/students", json=incomplete_request, headers=auth_headers)
+        response = client.post(
+            "/students", json=incomplete_request, headers=auth_headers
+        )
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_create_monk_student(self, client, auth_headers, mock_db_connection, sample_monk_request):
+    def test_create_monk_student(
+        self, client, auth_headers, mock_db_connection, sample_monk_request
+    ):
         """Test creating monk student with is_monk=True."""
         mock_cursor = mock_db_connection.cursor.return_value
         mock_cursor.fetchone.side_effect = [None, [888]]
 
-        response = client.post("/students", json=sample_monk_request, headers=auth_headers)
+        response = client.post(
+            "/students", json=sample_monk_request, headers=auth_headers
+        )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -152,13 +170,17 @@ class TestStudentCreation:
         # Gender is at index 7 in INSERT params
         assert insert_params[7] == "Monk"
 
-    def test_create_student_database_error(self, client, auth_headers, mock_db_connection, sample_student_request):
+    def test_create_student_database_error(
+        self, client, auth_headers, mock_db_connection, sample_student_request
+    ):
         """Test database error returns 500."""
         # Configure mock to raise exception on execute
         mock_cursor = mock_db_connection.cursor.return_value
         mock_cursor.execute.side_effect = Exception("Database connection lost")
 
-        response = client.post("/students", json=sample_student_request, headers=auth_headers)
+        response = client.post(
+            "/students", json=sample_student_request, headers=auth_headers
+        )
 
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert mock_db_connection.rollback.called
@@ -168,7 +190,9 @@ class TestStudentCreation:
 class TestStudentRetrieval:
     """Test GET /students/{student_id} endpoint."""
 
-    def test_get_student_success(self, client, auth_headers, mock_db_connection, sample_legacy_record):
+    def test_get_student_success(
+        self, client, auth_headers, mock_db_connection, sample_legacy_record
+    ):
         """Test successful student retrieval."""
         # Configure mock to return student record
         mock_cursor = mock_db_connection.cursor.return_value
@@ -207,7 +231,9 @@ class TestStudentRetrieval:
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_get_monk_student(self, client, auth_headers, mock_db_connection, sample_legacy_monk_record):
+    def test_get_monk_student(
+        self, client, auth_headers, mock_db_connection, sample_legacy_monk_record
+    ):
         """Test retrieving monk student with Gender='Monk'."""
         mock_cursor = mock_db_connection.cursor.return_value
         mock_cursor.fetchone.return_value = sample_legacy_monk_record
@@ -274,7 +300,9 @@ class TestStudentDeletion:
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_delete_student_database_error(self, client, auth_headers, mock_db_connection):
+    def test_delete_student_database_error(
+        self, client, auth_headers, mock_db_connection
+    ):
         """Test database error returns 500 and rolls back."""
         mock_cursor = mock_db_connection.cursor.return_value
         mock_cursor.execute.side_effect = Exception("Deadlock detected")
@@ -290,7 +318,9 @@ class TestStudentDeletion:
 class TestRateLimiting:
     """Test rate limiting middleware."""
 
-    def test_rate_limit_enforcement(self, client, auth_headers, mock_db_connection, sample_student_request):
+    def test_rate_limit_enforcement(
+        self, client, auth_headers, mock_db_connection, sample_student_request
+    ):
         """Test rate limiting blocks excessive requests."""
         # Configure mock for successful operations
         mock_cursor = mock_db_connection.cursor.return_value
@@ -299,11 +329,18 @@ class TestRateLimiting:
         # Make requests up to limit (60 per minute by default)
         # First 60 should succeed
         for _i in range(60):
-            response = client.post("/students", json=sample_student_request, headers=auth_headers)
-            assert response.status_code in [status.HTTP_200_OK, status.HTTP_409_CONFLICT]
+            response = client.post(
+                "/students", json=sample_student_request, headers=auth_headers
+            )
+            assert response.status_code in [
+                status.HTTP_200_OK,
+                status.HTTP_409_CONFLICT,
+            ]
 
         # 61st request should be rate limited
-        response = client.post("/students", json=sample_student_request, headers=auth_headers)
+        response = client.post(
+            "/students", json=sample_student_request, headers=auth_headers
+        )
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
 
     def test_health_check_exempt_from_rate_limiting(self, client, mock_db_connection):
@@ -333,17 +370,23 @@ class TestAuthentication:
     def test_invalid_api_key(self, client, sample_student_request):
         """Test request with wrong API key is rejected."""
         headers = {"X-API-Key": "wrong-key"}
-        response = client.post("/students", json=sample_student_request, headers=headers)
+        response = client.post(
+            "/students", json=sample_student_request, headers=headers
+        )
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         data = response.json()
         assert "invalid" in data["detail"].lower()
 
-    def test_valid_api_key(self, client, auth_headers, mock_db_connection, sample_student_request):
+    def test_valid_api_key(
+        self, client, auth_headers, mock_db_connection, sample_student_request
+    ):
         """Test request with correct API key is accepted."""
         mock_cursor = mock_db_connection.cursor.return_value
         mock_cursor.fetchone.side_effect = [None, [999]]
 
-        response = client.post("/students", json=sample_student_request, headers=auth_headers)
+        response = client.post(
+            "/students", json=sample_student_request, headers=auth_headers
+        )
 
         assert response.status_code == status.HTTP_200_OK

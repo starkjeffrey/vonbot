@@ -1,20 +1,21 @@
 from logic.course_matching import get_course_last_offered
 from database.connection import db_cursor
 
+
 def test_history():
     # Test with a few known courses
-    test_courses = ['ACCT-300', 'LAW-273', 'BUS-360', 'NON-EXISTENT']
-    
+    test_courses = ["ACCT-300", "LAW-273", "BUS-360", "NON-EXISTENT"]
+
     print("--- Testing Course History Logic ---")
-    
+
     for course in test_courses:
         print(f"\nChecking history for: {course}")
         history = get_course_last_offered(course)
-        
+
         if history:
             print(f"✅ Found: {history}")
         else:
-            print(f"❌ No history found (or error).")
+            print("❌ No history found (or error).")
 
     # Also inspect raw ClassId to verify parsing logic
     print("\n--- Inspecting Raw ClassId Samples ---")
@@ -27,6 +28,7 @@ def test_history():
                 print(row)
     except Exception as e:
         print(f"Error inspecting ClassId: {e}")
+
 
 if __name__ == "__main__":
     test_history()
