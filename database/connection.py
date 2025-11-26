@@ -19,11 +19,31 @@ if os.path.exists(freetds_conf_path):
 
 # Settings class to handle configuration
 class Settings:
-    LEGACY_DB_HOST = os.getenv("LEGACY_DB_HOST", "96.9.90.64")
-    LEGACY_DB_PORT = int(os.getenv("LEGACY_DB_PORT", 1500))
-    LEGACY_DB_USER = os.getenv("LEGACY_DB_USER", "sa")
-    LEGACY_DB_PASSWORD = os.getenv("LEGACY_DB_PASSWORD", "")
-    LEGACY_DB_NAME = os.getenv("LEGACY_DB_NAME", "New_PUCDB")
+    LEGACY_DB_HOST = os.getenv("LEGACY_DB_HOST")
+    LEGACY_DB_PORT = int(os.getenv("LEGACY_DB_PORT")) if os.getenv("LEGACY_DB_PORT") else None
+    LEGACY_DB_USER = os.getenv("LEGACY_DB_USER")
+    LEGACY_DB_PASSWORD = os.getenv("LEGACY_DB_PASSWORD")
+    LEGACY_DB_NAME = os.getenv("LEGACY_DB_NAME")
+    
+    def __post_init__(self):
+        """Validate that all required environment variables are set."""
+        missing = []
+        if not self.LEGACY_DB_HOST:
+            missing.append("LEGACY_DB_HOST")
+        if not self.LEGACY_DB_PORT:
+            missing.append("LEGACY_DB_PORT")
+        if not self.LEGACY_DB_USER:
+            missing.append("LEGACY_DB_USER")
+        if not self.LEGACY_DB_PASSWORD:
+            missing.append("LEGACY_DB_PASSWORD")
+        if not self.LEGACY_DB_NAME:
+            missing.append("LEGACY_DB_NAME")
+        
+        if missing:
+            raise ValueError(
+                f"Missing required environment variables: {', '.join(missing)}. "
+                "Please ensure they are set in your .env file."
+            )
 
 settings = Settings()
 
