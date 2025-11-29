@@ -11,13 +11,51 @@ Key optimizations:
 
 import streamlit as st
 import pandas as pd
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 st.set_page_config(
     page_title="Academic Scheduling Tool",
     page_icon="🎓",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
+
+
+def check_login():
+    """Check if user is authenticated."""
+    return st.session_state.get("authenticated", False)
+
+
+def login_page():
+    """Display login page."""
+    st.title("🎓 Academic Scheduling Tool")
+    st.subheader("Admin Login")
+
+    # Center the login form
+    col1, col2, col3 = st.columns([1, 2, 1])
+
+    with col2:
+        with st.form("login_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            submit = st.form_submit_button("Login", type="primary", use_container_width=True)
+
+            if submit:
+                admin_user = os.getenv("ADMIN_USERNAME", "admin")
+                admin_pass = os.getenv("ADMIN_PASSWORD", "admin")
+
+                if username == admin_user and password == admin_pass:
+                    st.session_state["authenticated"] = True
+                    st.session_state["username"] = username
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password")
+
+        st.caption("Contact IT support if you need access.")
 
 
 def load_cached_session():
@@ -73,6 +111,14 @@ def main():
 
     # Sidebar for navigation and global settings
     with st.sidebar:
+        # Show logged in user and logout button
+        st.caption(f"👤 Logged in as: **{st.session_state.get('username', 'Admin')}**")
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state["authenticated"] = False
+            st.session_state["username"] = None
+            st.rerun()
+
+        st.divider()
         st.header("Navigation")
         app_mode = st.radio("Go to", ["Admin Dashboard", "Student Portal"])
 
@@ -802,4 +848,7 @@ def student_portal():
 
 
 if __name__ == "__main__":
-    main()
+    if check_login():
+        main()
+    else:
+        login_page()
