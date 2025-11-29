@@ -1,5 +1,0 @@
-streamlit
-pymssql
-pandas
-polars
-python-dotenv

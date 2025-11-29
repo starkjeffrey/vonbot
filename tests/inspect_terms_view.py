@@ -4,10 +4,10 @@ from database.connection import db_cursor
 def inspect_data():
     print("--- Inspecting vw_BAlatestgrade Students ---")
     query = """
-    SELECT TOP 10 s.ID, s.Name, s.BatchIDForMaster, v.termstart
+    SELECT TOP 10 s.ID, s.Name, s.BatchIDForDoctor, v.termstart
     FROM vw_BAlatestgrade v
     JOIN Students s ON v.id = s.ID
-    WHERE s.BatchIDForMaster IS NOT NULL AND s.BatchIDForMaster <> ''
+    WHERE s.BatchIDForDoctor IS NOT NULL AND s.BatchIDForDoctor <> ''
     ORDER BY v.termstart DESC
     """
     try:
