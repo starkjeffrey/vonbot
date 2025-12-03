@@ -13,19 +13,19 @@ import os
 import streamlit as st
 from database.connection import db_cursor
 
-# Load requirements CSV (simplified version with just course codes and major columns)
-REQUIREMENTS_FILE = "curriculum_requirements.csv"
+# Load requirements CSV with course codes, major columns, and course titles
+REQUIREMENTS_FILE = "curriculum_requirements2.csv"
 
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
 def load_requirements():
-    """Load simplified requirements CSV with columns: course_code, BAD, THM, FIN, TES, INT.
+    """Load requirements CSV with columns: course_code, BAD, THM, FIN, TES, INT, course_title.
 
     CACHED: This function reads from disk only once per hour.
     """
     if os.path.exists(REQUIREMENTS_FILE):
         try:
-            return pd.read_csv(REQUIREMENTS_FILE)
+            return pd.read_csv(REQUIREMENTS_FILE, sep='\t')
         except Exception as e:
             print(f"Error reading requirements CSV: {e}")
             return pd.DataFrame()
@@ -72,6 +72,54 @@ def get_bulk_transcripts(student_ids: tuple) -> dict:
     return results
 
 
+def normalize_course_code(code: str) -> str:
+    """Normalize course code by removing spaces and hyphens for matching."""
+    if not code:
+        return ""
+    return code.replace(" ", "").replace("-", "").upper()
+
+
+def get_course_title(course_code: str, requirements_df: pd.DataFrame = None) -> str:
+    """Get the course title for a given course code.
+
+    Args:
+        course_code: The course code (e.g., 'ACCT-300')
+        requirements_df: Optional pre-loaded requirements DataFrame. If None, will load it.
+
+    Returns:
+        Course title string, or empty string if not found
+    """
+    if requirements_df is None:
+        requirements_df = load_requirements()
+
+    if requirements_df.empty or 'course_title' not in requirements_df.columns:
+        return ""
+
+    match = requirements_df[requirements_df['course_code'] == course_code]
+    if not match.empty:
+        title = match.iloc[0]['course_title']
+        # Remove quotes if present
+        if isinstance(title, str):
+            return title.strip('"')
+    return ""
+
+
+def format_course_with_title(course_code: str, requirements_df: pd.DataFrame = None) -> str:
+    """Format a course code with its title for display.
+
+    Args:
+        course_code: The course code (e.g., 'ACCT-300')
+        requirements_df: Optional pre-loaded requirements DataFrame
+
+    Returns:
+        Formatted string like 'ACCT-300: Intro to Pub Policy & Admin'
+    """
+    title = get_course_title(course_code, requirements_df)
+    if title:
+        return f"{course_code}: {title}"
+    return course_code
+
+
 @st.cache_data(ttl=600)  # Cache for 10 minutes
 def get_bulk_course_history(course_codes: tuple) -> dict:
     """
@@ -90,26 +138,46 @@ def get_bulk_course_history(course_codes: tuple) -> dict:
 
     results = {code: None for code in course_codes}
 
+    # Create a normalized mapping for flexible matching
+    normalized_to_original = {normalize_course_code(code): code for code in course_codes}
+
     # Query to get most recent offering for each course
-    # Using a CTE to rank by date and get the most recent
+    # Extract 5th part of ClassId as course code
+    # Filter: Attendance='Normal' AND at least 15 students
     query = """
-    WITH RankedOfferings AS (
+    WITH CourseOfferings AS (
         SELECT
-            SUBSTRING(act.ClassId, CHARINDEX('!$', act.ClassId) + 2,
-                CHARINDEX('!$', act.ClassId, CHARINDEX('!$', act.ClassId) + 2) - CHARINDEX('!$', act.ClassId) - 2) as CourseCode,
+            -- Extract 5th part of ClassId (course code)
+            PARSENAME(REPLACE(act.ClassId, '!$', '.'), 1) as CourseCode,
             t.TermName,
             t.StartDate,
             DATEDIFF(month, t.StartDate, GETDATE()) as MonthsAgo,
-            ROW_NUMBER() OVER (
-                PARTITION BY SUBSTRING(act.ClassId, CHARINDEX('!$', act.ClassId) + 2,
-                    CHARINDEX('!$', act.ClassId, CHARINDEX('!$', act.ClassId) + 2) - CHARINDEX('!$', act.ClassId) - 2)
-                ORDER BY t.StartDate DESC
-            ) as rn
+            COUNT(act.ID) as StudentCount
         FROM AcademicCourseTakers act
         JOIN Terms t ON LEFT(act.ClassId, CHARINDEX('!$', act.ClassId) - 1) = t.TermId
         WHERE CHARINDEX('!$', act.ClassId) > 0
+        AND act.Attendance = 'Normal'
+        GROUP BY
+            PARSENAME(REPLACE(act.ClassId, '!$', '.'), 1),
+            t.TermName,
+            t.StartDate,
+            act.ClassId
+        HAVING COUNT(act.ID) > 15
+    ),
+    RankedOfferings AS (
+        SELECT
+            CourseCode,
+            TermName,
+            StartDate,
+            MonthsAgo,
+            StudentCount,
+            ROW_NUMBER() OVER (
+                PARTITION BY CourseCode
+                ORDER BY StartDate DESC
+            ) as rn
+        FROM CourseOfferings
     )
-    SELECT CourseCode, TermName, StartDate, MonthsAgo
+    SELECT CourseCode, TermName, StartDate, MonthsAgo, StudentCount
     FROM RankedOfferings
     WHERE rn = 1
     """
@@ -118,15 +186,29 @@ def get_bulk_course_history(course_codes: tuple) -> dict:
         with db_cursor() as cursor:
             cursor.execute(query)
             for row in cursor.fetchall():
-                course_code = row["CourseCode"]
-                if course_code in results:
-                    results[course_code] = {
+                db_course_code = row["CourseCode"]
+
+                # Try exact match first
+                if db_course_code in results:
+                    results[db_course_code] = {
                         "TermName": row["TermName"],
                         "StartDate": row["StartDate"],
                         "MonthsAgo": row["MonthsAgo"]
                     }
+                else:
+                    # Try normalized match (handles spacing/hyphen differences)
+                    normalized_db_code = normalize_course_code(db_course_code)
+                    if normalized_db_code in normalized_to_original:
+                        original_code = normalized_to_original[normalized_db_code]
+                        results[original_code] = {
+                            "TermName": row["TermName"],
+                            "StartDate": row["StartDate"],
+                            "MonthsAgo": row["MonthsAgo"]
+                        }
     except Exception as e:
         print(f"Error bulk fetching course history: {e}")
+        import traceback
+        traceback.print_exc()
         # Fallback to individual queries if bulk fails
         for code in course_codes:
             results[code] = get_course_last_offered(code)
@@ -238,22 +320,50 @@ def get_course_last_offered(course_code: str):
     Returns:
         dict: {'TermName': str, 'StartDate': date, 'MonthsAgo': int}
     """
+    # Normalize course code for matching
+    normalized_code = normalize_course_code(course_code)
+
     query = """
+    WITH CourseOfferings AS (
+        SELECT
+            PARSENAME(REPLACE(act.ClassId, '!$', '.'), 1) as CourseCode,
+            t.TermName,
+            t.StartDate,
+            DATEDIFF(month, t.StartDate, GETDATE()) as MonthsAgo,
+            COUNT(act.ID) as StudentCount
+        FROM AcademicCourseTakers act
+        JOIN Terms t ON LEFT(act.ClassId, CHARINDEX('!$', act.ClassId) - 1) = t.TermId
+        WHERE CHARINDEX('!$', act.ClassId) > 0
+        AND act.Attendance = 'Normal'
+        GROUP BY
+            PARSENAME(REPLACE(act.ClassId, '!$', '.'), 1),
+            t.TermName,
+            t.StartDate,
+            act.ClassId
+        HAVING COUNT(act.ID) > 15
+    )
     SELECT TOP 1
-        t.TermName,
-        t.StartDate,
-        DATEDIFF(month, t.StartDate, GETDATE()) as MonthsAgo
-    FROM AcademicCourseTakers act
-    JOIN Terms t ON LEFT(act.ClassId, CHARINDEX('!$', act.ClassId) - 1) = t.TermId
-    WHERE act.ClassId LIKE %s
-    AND CHARINDEX('!$', act.ClassId) > 0
-    ORDER BY t.StartDate DESC
+        CourseCode,
+        TermName,
+        StartDate,
+        MonthsAgo
+    FROM CourseOfferings
+    ORDER BY StartDate DESC
     """
     try:
         with db_cursor() as cursor:
-            cursor.execute(query, (f"%{course_code}%",))
-            row = cursor.fetchone()
-            return row if row else None
+            cursor.execute(query)
+            for row in cursor.fetchall():
+                db_course_code = row["CourseCode"]
+                # Try exact or normalized match
+                if (db_course_code == course_code or
+                    normalize_course_code(db_course_code) == normalized_code):
+                    return {
+                        "TermName": row["TermName"],
+                        "StartDate": row["StartDate"],
+                        "MonthsAgo": row["MonthsAgo"]
+                    }
+            return None
     except Exception as e:
         print(f"Error fetching history for {course_code}: {e}")
         return None

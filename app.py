@@ -17,6 +17,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Import course display helpers
+from logic.course_matching import load_requirements, format_course_with_title
+
 st.set_page_config(
     page_title="Academic Scheduling Tool",
     page_icon="🎓",
@@ -308,7 +311,7 @@ def render_course_matching_tab():
 
     # Display results (no recomputation needed - just read from session_state)
     if "needs_df" in st.session_state and "demand_df" in st.session_state:
-        demand_df = st.session_state["demand_df"]
+        demand_df = st.session_state["demand_df"].copy()
 
         st.divider()
         st.subheader("Course Demand & History")
@@ -316,6 +319,14 @@ def render_course_matching_tab():
             "All courses with at least 1 student demand are shown. Consider prioritizing high demand and courses not offered recently.")
 
         if not demand_df.empty:
+            # Load requirements for course titles
+            requirements_df = load_requirements()
+            
+            # Add formatted course display column
+            demand_df["Course Display"] = demand_df["Course"].apply(
+                lambda x: format_course_with_title(x, requirements_df)
+            )
+            
             sort_col = st.selectbox("Sort by", ["Demand", "Months Ago"], index=0)
 
             display_df = demand_df.sort_values(by=sort_col, ascending=False)
@@ -323,11 +334,16 @@ def render_course_matching_tab():
             # Show total count
             st.caption(f"Showing all {len(display_df)} courses with demand")
 
+            # Reorder columns to show Course Display first
+            column_order = ["Course Display", "Demand", "Last Offered", "Months Ago"]
+            display_df = display_df[column_order]
+
             st.dataframe(
                 display_df,
                 use_container_width=True,
                 height=min(len(display_df) * 35 + 38, 600),  # Dynamic height, max 600px
                 column_config={
+                    "Course Display": "Course",
                     "Last Offered": st.column_config.DateColumn("Last Offered"),
                     "Demand": st.column_config.ProgressColumn(
                         "Student Demand",
@@ -407,8 +423,14 @@ def render_class_rosters_tab():
         metadata_cols = ["StudentId", "Name", "Email", "Major", "Cohort", "LastEnroll"]
         course_options = [c for c in needs_df.columns if c not in metadata_cols]
 
-    selected_course = st.selectbox("Select Course to Create/Manage",
-                                   options=course_options)
+    # Load requirements for course title display
+    requirements_df = load_requirements()
+    
+    selected_course = st.selectbox(
+        "Select Course to Create/Manage",
+        options=course_options,
+        format_func=lambda x: format_course_with_title(x, requirements_df)
+    )
 
     if selected_course:
         current_roster = st.session_state["rosters"].get(selected_course, [])
@@ -417,16 +439,44 @@ def render_class_rosters_tab():
 
         # Filter Eligible Students
         eligible_students = needs_df[needs_df[selected_course] == 1].copy()
+        
+        # Extract major prefix for filtering (e.g., "TES-53E" -> "TES")
+        eligible_students["MajorPrefix"] = eligible_students["Major"].apply(
+            lambda x: x.split("-")[0] if "-" in str(x) else str(x)[:3]
+        )
 
-        # Filter by Cohort
-        cohorts = sorted(eligible_students["Cohort"].unique().tolist())
+        # Filter by Major (applied first)
+        st.write("**Filter by Major:**")
+        selected_major = st.radio(
+            "Select Major",
+            options=["All", "BUS", "TES", "INT", "TOU", "FIN"],
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+        
+        if selected_major != "All":
+            # Map display names to actual prefixes
+            major_mapping = {
+                "BUS": "BAD",  # Business Administration
+                "TES": "TES",  # TESOL
+                "INT": "INT",  # International Relations
+                "TOU": "THM",  # Tourism and Hospitality Management
+                "FIN": "FIN"   # Finance
+            }
+            actual_prefix = major_mapping.get(selected_major, selected_major)
+            filtered_students = eligible_students[
+                eligible_students["MajorPrefix"] == actual_prefix
+            ]
+        else:
+            filtered_students = eligible_students
+        
+        # Filter by Cohort (applied second, after major filter)
+        cohorts = sorted(filtered_students["Cohort"].unique().tolist())
         selected_cohort = st.selectbox("Filter by Cohort", ["All"] + cohorts)
 
         if selected_cohort != "All":
-            filtered_students = eligible_students[
-                eligible_students["Cohort"] == selected_cohort]
-        else:
-            filtered_students = eligible_students
+            filtered_students = filtered_students[
+                filtered_students["Cohort"] == selected_cohort]
 
         # Display Interactive Table
         st.write("### Select Students to Assign")
@@ -543,7 +593,7 @@ def render_manage_rosters_tab():
     # Filter selector
     enrollment_filter = st.radio(
         "Filter students by enrollment status:",
-        ["Show All Rosters", "Show Over-Enrolled (>3)", "Show Under-Enrolled (<3)"],
+        ["Show All Rosters", "Show Over-Enrolled (>3)", "Show Exactly 3 Courses (=3)", "Show Under-Enrolled (<3)"],
         horizontal=True,
         key="enrollment_filter"
     )
@@ -552,11 +602,18 @@ def render_manage_rosters_tab():
     if enrollment_filter == "Show Over-Enrolled (>3)":
         st.divider()
         st.subheader("⚠️ Over-Enrolled Students (>3 courses)")
+        
+        # Load requirements for course title display
+        requirements_df = load_requirements()
+        
         if over_enrolled:
             for student in sorted(over_enrolled, key=lambda x: x["count"], reverse=True):
+                # Format course names with titles
+                courses_display = [format_course_with_title(c, requirements_df) for c in student['courses']]
+                
                 with st.expander(f"🔴 {student['Name']} - {student['count']} courses", expanded=True):
                     st.write(f"**ID:** {student['StudentId']} | **Major:** {student['Major']} | **Cohort:** {student['Cohort']}")
-                    st.write(f"**Enrolled in:** {', '.join(student['courses'])}")
+                    st.write(f"**Enrolled in:** {', '.join(courses_display)}")
 
                     # Quick remove buttons
                     st.write("**Remove from:**")
@@ -569,9 +626,40 @@ def render_manage_rosters_tab():
             st.success("No over-enrolled students!")
         return  # Don't show regular roster view
 
+    elif enrollment_filter == "Show Exactly 3 Courses (=3)":
+        st.divider()
+        st.subheader("✅ Students with Exactly 3 Courses")
+        
+        # Load requirements for course title display
+        requirements_df = load_requirements()
+        
+        if correct_load:
+            for student in sorted(correct_load, key=lambda x: x["Name"]):
+                # Format course names with titles
+                courses_display = [format_course_with_title(c, requirements_df) for c in student['courses']]
+                
+                with st.expander(f"🟢 {student['Name']} - {student['count']} courses", expanded=False):
+                    st.write(f"**ID:** {student['StudentId']} | **Major:** {student['Major']} | **Cohort:** {student['Cohort']}")
+                    st.write(f"**Enrolled in:** {', '.join(courses_display)}")
+
+                    # Quick remove buttons (in case adjustment needed)
+                    st.write("**Remove from:**")
+                    cols = st.columns(min(len(student['courses']), 3))
+                    for i, course in enumerate(student['courses']):
+                        if cols[i].button(f"🗑️ {course}", key=f"correct_remove_{student['StudentId']}_{course}"):
+                            remove_student_from_roster(course, student['StudentId'])
+                            st.rerun()
+        else:
+            st.info("No students have exactly 3 courses yet.")
+        return  # Don't show regular roster view
+
     elif enrollment_filter == "Show Under-Enrolled (<3)":
         st.divider()
         st.subheader("📉 Under-Enrolled Students (<3 courses)")
+        
+        # Load requirements for course title display
+        requirements_df = load_requirements()
+        
         if under_enrolled:
             # Get needs_df to calculate total remaining courses
             needs_df = st.session_state.get("needs_df")
@@ -591,12 +679,15 @@ def render_manage_rosters_tab():
                             except (KeyError, IndexError, TypeError):
                                 pass
 
+                # Format course names with titles
+                courses_display = [format_course_with_title(c, requirements_df) for c in student['courses']] if student['courses'] else []
+
                 # Display with courses left info
                 left_text = f" [{courses_left} left]" if courses_left > 0 else ""
                 with st.expander(f"🟡 {student['Name']} - {student['count']} course(s){left_text}", expanded=False):
                     st.write(f"**ID:** {student['StudentId']} | **Major:** {student['Major']} | **Cohort:** {student['Cohort']}")
-                    if student['courses']:
-                        st.write(f"**Currently enrolled in:** {', '.join(student['courses'])}")
+                    if courses_display:
+                        st.write(f"**Currently enrolled in:** {', '.join(courses_display)}")
                     else:
                         st.write("**Currently enrolled in:** None")
                     st.write(f"**Total courses remaining to graduate:** {courses_left}")
@@ -608,6 +699,9 @@ def render_manage_rosters_tab():
     # Regular roster view (Show All Rosters)
     st.divider()
     st.subheader("📚 All Class Rosters")
+
+    # Load requirements for course title display
+    requirements_df = load_requirements()
 
     # Option to clear all rosters
     col1, col2 = st.columns([3, 1])
@@ -621,7 +715,8 @@ def render_manage_rosters_tab():
 
     # Show each roster in an expander
     for course, students in active_rosters.items():
-        with st.expander(f"📚 {course} ({len(students)} students)", expanded=False):
+        course_display = format_course_with_title(course, requirements_df)
+        with st.expander(f"📚 {course_display} ({len(students)} students)", expanded=False):
             if students:
                 # Create a dataframe with a remove column
                 roster_df = pd.DataFrame(students)
@@ -688,6 +783,9 @@ def render_schedule_optimization_tab():
 
     # Lazy import
     from logic.optimization import TIME_SLOTS, check_roster_conflicts
+    
+    # Load requirements for course title display
+    requirements_df = load_requirements()
 
     offered_courses = {}
 
@@ -696,8 +794,9 @@ def render_schedule_optimization_tab():
     for i, course in enumerate(active_classes):
         with cols[i % 3]:
             student_count = len(rosters.get(course, []))
+            course_display = format_course_with_title(course, requirements_df)
             slot = st.selectbox(
-                f"{course} ({student_count} students)",
+                f"{course_display} ({student_count} students)",
                 options=["Unassigned"] + TIME_SLOTS,
                 key=f"slot_{course}",
             )
@@ -720,12 +819,15 @@ def render_schedule_optimization_tab():
             st.write("**Resolve conflicts by removing a student from one of their conflicting courses:**")
 
             for idx, conflict in enumerate(conflicts):
+                # Format course names with titles
+                courses_display = [format_course_with_title(c, requirements_df) for c in conflict['Courses']]
+                
                 with st.container():
                     st.markdown(f"""
                     ---
                     **Student:** {conflict['Name']} (`{conflict['StudentId']}`)
                     **Conflicting Slot:** `{conflict['ConflictSlot']}`
-                    **Courses in conflict:** {', '.join(conflict['Courses'])}
+                    **Courses in conflict:** {', '.join(courses_display)}
                     """)
 
                     # Create remove buttons for each conflicting course
@@ -758,7 +860,7 @@ def render_schedule_optimization_tab():
                 st.write("**Final Schedule:**")
                 schedule_data = [
                     {
-                        "Course": c,
+                        "Course": format_course_with_title(c, requirements_df),
                         "Time Slot": s,
                         "Students": len(rosters.get(c, []))
                     }
@@ -778,6 +880,9 @@ def render_communications_tab():
 
     schedule = st.session_state["final_schedule"]
     needs_df = st.session_state["needs_df"]
+    
+    # Load requirements for course title display
+    requirements_df = load_requirements()
 
     scheduled_courses = list(schedule.keys())
 
@@ -790,10 +895,13 @@ def render_communications_tab():
                 student_courses.append(course)
 
         if student_courses:
+            # Format courses with titles for display
+            courses_display = [format_course_with_title(c, requirements_df) for c in student_courses]
             affected_students.append({
                 "Name": row["Name"],
                 "Email": row.get("Email", ""),
-                "Courses": ", ".join(student_courses),
+                "Courses": ", ".join(courses_display),
+                "CoursesCodes": student_courses,  # Keep original codes for internal use
             })
 
     if not affected_students:
@@ -833,7 +941,8 @@ def render_communications_tab():
 
                 message = "📢 **Course Schedule Update**\n\nThe following courses are now open for registration:\n\n"
                 for course, slot in schedule.items():
-                    message += f"- {course}: {slot}\n"
+                    course_display = format_course_with_title(course, requirements_df)
+                    message += f"- {course_display}: {slot}\n"
 
                 send_telegram_message(telegram_chat_id, message)
                 st.success("Telegram update sent!")
