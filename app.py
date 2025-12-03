@@ -878,7 +878,7 @@ def render_schedule_optimization_tab():
 def render_download_rosters_tab():
     """Download Rosters Tab - Export rosters to XLSX or CSV."""
     st.subheader("📥 Download Class Rosters")
-    st.write("Export your class rosters for offline use or sharing.")
+    st.write("Export your class rosters for student feedback emails.")
 
     if "rosters" not in st.session_state or not st.session_state["rosters"]:
         st.warning("⚠️ No rosters available. Please create rosters in the 'Manage Rosters' tab first.")
@@ -889,102 +889,216 @@ def render_download_rosters_tab():
     # Load requirements for course title display
     requirements_df = load_requirements()
 
-    st.info(f"📊 **{len(rosters)}** class roster(s) ready for download")
+    # Get schedule information for time slots
+    schedule = st.session_state.get("offered_courses", {})
 
-    # Format selection
-    st.write("### Export Options")
-    col1, col2 = st.columns(2)
+    # Calculate total courses per student
+    from logic.cache import get_student_course_counts
+    student_course_counts = get_student_course_counts(rosters)
 
-    with col1:
-        export_format = st.radio(
-            "Select format:",
-            options=["Excel (XLSX)", "CSV"],
-            help="XLSX recommended for multiple sheets"
-        )
+    # Count total student-course pairings
+    total_enrollments = sum(len(students) for students in rosters.values())
+    unique_students = len(student_course_counts)
 
-    with col2:
-        if export_format == "Excel (XLSX)":
-            export_option = st.radio(
-                "Export as:",
-                options=["Single file (multiple sheets)", "Separate files per class"],
-                help="Single file: one Excel with multiple sheets\nSeparate files: one Excel per class"
-            )
-        else:
-            export_option = st.radio(
-                "Export as:",
-                options=["Single ZIP archive", "Separate files per class"],
-                help="Single ZIP: all CSV files in one archive\nSeparate files: download each individually"
-            )
+    st.info(f"📊 **{len(rosters)}** classes • **{unique_students}** students • **{total_enrollments}** total enrollments")
 
     st.divider()
 
     # Preview section
     with st.expander("👁️ Preview Roster Data", expanded=False):
+        st.caption("Showing first few rows of the export data:")
+
+        # Build preview data (first 10 rows)
+        preview_rows = []
+        count = 0
         for course, students in rosters.items():
             course_display = format_course_with_title(course, requirements_df)
-            st.write(f"**{course_display}** — {len(students)} students")
-            if students:
-                preview_df = pd.DataFrame(students)
-                st.dataframe(preview_df.head(3), use_container_width=True)
+            time_slot = schedule.get(course, "Unassigned")
+
+            for student in students:
+                if count >= 10:
+                    break
+                student_id = student["StudentId"]
+                total_courses = student_course_counts.get(student_id, {}).get("count", 0)
+
+                preview_rows.append({
+                    "Total Courses": total_courses,
+                    "StudentID": student_id,
+                    "Name": student.get("Name", ""),
+                    "Email": student.get("Email", ""),
+                    "LastActiveDate": student.get("LastActiveDate", ""),
+                    "Major": student.get("Major", ""),
+                    "Cohort": student.get("Cohort", ""),
+                    "CourseCode": course,
+                    "Course Title": get_course_title(course, requirements_df),
+                    "Time Slot": time_slot,
+                })
+                count += 1
+            if count >= 10:
+                break
+
+        if preview_rows:
+            preview_df = pd.DataFrame(preview_rows)
+            st.dataframe(preview_df, use_container_width=True, hide_index=True)
 
     st.divider()
 
-    # Download section
-    st.write("### Download Files")
-    st.caption("Fields to be included: [User will specify exact fields]")
-    st.caption("Placeholder: StudentId, Name, Email, Major, Cohort")
+    # Export section
+    st.write("### 📤 Export Data")
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.caption("""
+        **Included Fields:**
+        • Total Courses (count per student)
+        • StudentID
+        • Name
+        • Email
+        • LastActiveDate
+        • Major
+        • Cohort
+        • CourseCode
+        • Course Title
+        • Time Slot
+        """)
+
+    with col2:
+        export_format = st.radio(
+            "Format:",
+            options=["Excel (XLSX)", "CSV"],
+            help="Choose your preferred format"
+        )
+
+    st.divider()
+
+    # Generate export data
+    export_rows = []
+    for course, students in rosters.items():
+        course_title = get_course_title(course, requirements_df)
+        time_slot = schedule.get(course, "Unassigned")
+
+        for student in students:
+            student_id = student["StudentId"]
+            total_courses = student_course_counts.get(student_id, {}).get("count", 0)
+
+            export_rows.append({
+                "Total Courses": total_courses,
+                "StudentID": student_id,
+                "Name": student.get("Name", ""),
+                "Email": student.get("Email", ""),
+                "LastActiveDate": student.get("LastActiveDate", ""),
+                "Major": student.get("Major", ""),
+                "Cohort": student.get("Cohort", ""),
+                "CourseCode": course,
+                "Course Title": course_title,
+                "Time Slot": time_slot,
+            })
+
+    export_df = pd.DataFrame(export_rows)
+
+    # Sort by StudentID, then by CourseCode for better organization
+    export_df = export_df.sort_values(["StudentID", "CourseCode"])
 
     if export_format == "Excel (XLSX)":
-        if export_option == "Single file (multiple sheets)":
-            if st.button("📥 Download All Rosters (XLSX)", type="primary", use_container_width=True):
-                # TODO: Implement single XLSX with multiple sheets
-                st.info("🚧 Implementation pending: Single XLSX with multiple sheets")
-                st.write("Will create one Excel file with:")
-                for course in rosters.keys():
-                    course_display = format_course_with_title(course, requirements_df)
-                    st.write(f"  • Sheet: {course_display}")
-        else:
-            st.write("Download each class roster individually:")
-            for course, students in rosters.items():
-                course_display = format_course_with_title(course, requirements_df)
-                if st.button(f"📥 Download {course_display} (XLSX)", key=f"download_xlsx_{course}"):
-                    # TODO: Implement individual XLSX download
-                    st.info(f"🚧 Implementation pending: {course_display} XLSX")
+        # Generate XLSX file
+        import io
+        from datetime import datetime
+
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            export_df.to_excel(writer, sheet_name='Student Enrollments', index=False)
+
+            # Auto-adjust column widths
+            worksheet = writer.sheets['Student Enrollments']
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(cell.value)
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+
+        output.seek(0)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        st.download_button(
+            label="📥 Download Roster (XLSX)",
+            data=output,
+            file_name=f"student_enrollments_{timestamp}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            type="primary",
+            use_container_width=True
+        )
 
     else:  # CSV format
-        if export_option == "Single ZIP archive":
-            if st.button("📥 Download All Rosters (ZIP)", type="primary", use_container_width=True):
-                # TODO: Implement ZIP archive with multiple CSV files
-                st.info("🚧 Implementation pending: ZIP archive with CSV files")
-                st.write("Will create one ZIP file containing:")
-                for course in rosters.keys():
-                    course_display = format_course_with_title(course, requirements_df)
-                    st.write(f"  • {course}.csv")
-        else:
-            st.write("Download each class roster individually:")
-            for course, students in rosters.items():
-                course_display = format_course_with_title(course, requirements_df)
-                if st.button(f"📥 Download {course_display} (CSV)", key=f"download_csv_{course}"):
-                    # TODO: Implement individual CSV download
-                    st.info(f"🚧 Implementation pending: {course_display} CSV")
+        from datetime import datetime
+
+        csv_data = export_df.to_csv(index=False)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        st.download_button(
+            label="📥 Download Roster (CSV)",
+            data=csv_data,
+            file_name=f"student_enrollments_{timestamp}.csv",
+            mime="text/csv",
+            type="primary",
+            use_container_width=True
+        )
+
+    st.divider()
+
+    # Statistics
+    st.write("### 📊 Enrollment Statistics")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("Total Classes", len(rosters))
+
+    with col2:
+        st.metric("Unique Students", unique_students)
+
+    with col3:
+        st.metric("Total Enrollments", total_enrollments)
 
     # Help section
-    with st.expander("ℹ️ Help & Tips"):
+    with st.expander("ℹ️ Using This Export for Student Feedback"):
         st.markdown("""
-        **Export Formats:**
-        - **Excel (XLSX)**: Best for viewing in Excel/Google Sheets, supports multiple sheets
-        - **CSV**: Universal format, opens in any spreadsheet software
+        **Purpose:**
+        This export is designed for generating email communications to get feedback from students
+        about accepting the courses selected for them.
 
-        **Export Options:**
-        - **Single file**: All rosters in one file (recommended for archiving)
-        - **Separate files**: One file per class (recommended for sharing individual rosters)
+        **Data Format:**
+        - **One row per student-course pairing** (long format)
+        - Each student appears multiple times (once per enrolled course)
+        - "Total Courses" field shows how many courses each student is taking
 
         **Next Steps:**
-        After downloading, you can:
-        1. Share rosters with instructors
-        2. Import into student information systems
-        3. Generate email lists for class communications
-        4. Print for physical records
+        1. **Open in Excel/Google Sheets** for easy viewing and mail merge
+        2. **Filter by student** to see all courses for one student
+        3. **Generate emails** using mail merge with the Email field
+        4. **Track responses** by adding columns for student feedback
+
+        **Email Template Example:**
+        ```
+        Dear [Name],
+
+        We have scheduled the following [Total Courses] courses for you:
+        - [CourseCode]: [Course Title] at [Time Slot]
+        ...
+
+        Please confirm if you accept this schedule by [date].
+        ```
+
+        **Tips:**
+        - Students with multiple courses will have multiple rows
+        - Use pivot tables to summarize courses per student
+        - Sort by Email to group communications
+        - Filter by Major or Cohort for targeted outreach
         """)
 
 
