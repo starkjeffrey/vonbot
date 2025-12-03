@@ -39,6 +39,8 @@ def save_session_data(session_state: dict) -> str:
         "offered_courses": None,
         "final_schedule": None,
         "months_option": None,
+        "telegram_chat_id": None,
+        "telegram_draft": None,
     }
 
     # Save DataFrames as JSON
@@ -70,6 +72,13 @@ def save_session_data(session_state: dict) -> str:
     if "months_option" in session_state:
         cache_data["months_option"] = session_state["months_option"]
 
+    # Save communications drafts
+    if "telegram_chat_id" in session_state:
+        cache_data["telegram_chat_id"] = session_state["telegram_chat_id"]
+
+    if "telegram_draft" in session_state:
+        cache_data["telegram_draft"] = session_state["telegram_draft"]
+
     # Save to file
     cache_file = os.path.join(CACHE_DIR, "session_cache.json")
     with open(cache_file, "w") as f:
@@ -97,6 +106,8 @@ def load_session_data() -> dict:
         result = {
             "saved_at": cache_data.get("saved_at"),
             "months_option": cache_data.get("months_option"),
+            "telegram_chat_id": cache_data.get("telegram_chat_id"),
+            "telegram_draft": cache_data.get("telegram_draft"),
         }
 
         # Convert lists back to DataFrames

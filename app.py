@@ -80,6 +80,8 @@ def save_current_session():
     """Save current session to disk."""
     from logic.cache import save_session_data
     save_session_data(st.session_state)
+    # Show brief confirmation toast
+    st.toast("✓ Changes saved", icon="✅")
 
 
 # Load cache on startup
@@ -184,6 +186,7 @@ def admin_dashboard():
         "Class Rosters",
         "Manage Rosters",
         "Schedule Optimization",
+        "Download Rosters",
         "Communications",
     ])
 
@@ -203,6 +206,9 @@ def admin_dashboard():
         render_schedule_optimization_tab()
 
     with tabs[5]:
+        render_download_rosters_tab()
+
+    with tabs[6]:
         render_communications_tab()
 
 
@@ -869,85 +875,273 @@ def render_schedule_optimization_tab():
                 st.dataframe(pd.DataFrame(schedule_data), use_container_width=True, hide_index=True)
 
 
-def render_communications_tab():
-    """Communications Tab."""
-    st.subheader("Send Notifications")
-    st.write("Email students and manage Telegram groups.")
+def render_download_rosters_tab():
+    """Download Rosters Tab - Export rosters to XLSX or CSV."""
+    st.subheader("📥 Download Class Rosters")
+    st.write("Export your class rosters for offline use or sharing.")
 
-    if "final_schedule" not in st.session_state or "needs_df" not in st.session_state:
-        st.warning("Please optimize the schedule first.")
+    if "rosters" not in st.session_state or not st.session_state["rosters"]:
+        st.warning("⚠️ No rosters available. Please create rosters in the 'Manage Rosters' tab first.")
         return
 
-    schedule = st.session_state["final_schedule"]
-    needs_df = st.session_state["needs_df"]
-    
+    rosters = st.session_state["rosters"]
+
     # Load requirements for course title display
     requirements_df = load_requirements()
 
-    scheduled_courses = list(schedule.keys())
+    st.info(f"📊 **{len(rosters)}** class roster(s) ready for download")
 
-    # Identify affected students
-    affected_students = []
-    for _, row in needs_df.iterrows():
-        student_courses = []
-        for course in scheduled_courses:
-            if course in row and row[course] == 1:
-                student_courses.append(course)
-
-        if student_courses:
-            # Format courses with titles for display
-            courses_display = [format_course_with_title(c, requirements_df) for c in student_courses]
-            affected_students.append({
-                "Name": row["Name"],
-                "Email": row.get("Email", ""),
-                "Courses": ", ".join(courses_display),
-                "CoursesCodes": student_courses,  # Keep original codes for internal use
-            })
-
-    if not affected_students:
-        st.warning("No students need the currently scheduled courses.")
-        return
-
-    st.info(f"Found {len(affected_students)} students to notify.")
-
+    # Format selection
+    st.write("### Export Options")
     col1, col2 = st.columns(2)
 
     with col1:
-        st.write("### Email Notifications")
-        if st.button("Email All Scheduled Students"):
-            from services.email_service import send_email
-
-            progress_bar = st.progress(0)
-            for i, student in enumerate(affected_students):
-                email = student["Email"]
-                if email:
-                    subject = "Course Registration Update"
-                    body = f"Dear {student['Name']},\n\nPlease register for the following courses: {student['Courses']}.\n\nBest,\nAcademic Office"
-                    send_email(email, subject, body)
-                progress_bar.progress((i + 1) / len(affected_students))
-
-            st.success("Emails sent (check logs for mock output)!")
-
-    with col2:
-        st.write("### Telegram Notifications")
-        telegram_chat_id = st.text_input(
-            "Telegram Channel/Group ID",
-            placeholder="@channel_name or -100xxxxx",
+        export_format = st.radio(
+            "Select format:",
+            options=["Excel (XLSX)", "CSV"],
+            help="XLSX recommended for multiple sheets"
         )
 
-        if st.button("Broadcast Update"):
-            if telegram_chat_id:
-                from services.telegram_bot import send_telegram_message
+    with col2:
+        if export_format == "Excel (XLSX)":
+            export_option = st.radio(
+                "Export as:",
+                options=["Single file (multiple sheets)", "Separate files per class"],
+                help="Single file: one Excel with multiple sheets\nSeparate files: one Excel per class"
+            )
+        else:
+            export_option = st.radio(
+                "Export as:",
+                options=["Single ZIP archive", "Separate files per class"],
+                help="Single ZIP: all CSV files in one archive\nSeparate files: download each individually"
+            )
 
-                message = "📢 **Course Schedule Update**\n\nThe following courses are now open for registration:\n\n"
-                for course, slot in schedule.items():
+    st.divider()
+
+    # Preview section
+    with st.expander("👁️ Preview Roster Data", expanded=False):
+        for course, students in rosters.items():
+            course_display = format_course_with_title(course, requirements_df)
+            st.write(f"**{course_display}** — {len(students)} students")
+            if students:
+                preview_df = pd.DataFrame(students)
+                st.dataframe(preview_df.head(3), use_container_width=True)
+
+    st.divider()
+
+    # Download section
+    st.write("### Download Files")
+    st.caption("Fields to be included: [User will specify exact fields]")
+    st.caption("Placeholder: StudentId, Name, Email, Major, Cohort")
+
+    if export_format == "Excel (XLSX)":
+        if export_option == "Single file (multiple sheets)":
+            if st.button("📥 Download All Rosters (XLSX)", type="primary", use_container_width=True):
+                # TODO: Implement single XLSX with multiple sheets
+                st.info("🚧 Implementation pending: Single XLSX with multiple sheets")
+                st.write("Will create one Excel file with:")
+                for course in rosters.keys():
                     course_display = format_course_with_title(course, requirements_df)
-                    message += f"- {course_display}: {slot}\n"
+                    st.write(f"  • Sheet: {course_display}")
+        else:
+            st.write("Download each class roster individually:")
+            for course, students in rosters.items():
+                course_display = format_course_with_title(course, requirements_df)
+                if st.button(f"📥 Download {course_display} (XLSX)", key=f"download_xlsx_{course}"):
+                    # TODO: Implement individual XLSX download
+                    st.info(f"🚧 Implementation pending: {course_display} XLSX")
 
-                send_telegram_message(telegram_chat_id, message)
-                st.success("Telegram update sent!")
-            else:
-                st.error("Please enter a Chat ID.")
+    else:  # CSV format
+        if export_option == "Single ZIP archive":
+            if st.button("📥 Download All Rosters (ZIP)", type="primary", use_container_width=True):
+                # TODO: Implement ZIP archive with multiple CSV files
+                st.info("🚧 Implementation pending: ZIP archive with CSV files")
+                st.write("Will create one ZIP file containing:")
+                for course in rosters.keys():
+                    course_display = format_course_with_title(course, requirements_df)
+                    st.write(f"  • {course}.csv")
+        else:
+            st.write("Download each class roster individually:")
+            for course, students in rosters.items():
+                course_display = format_course_with_title(course, requirements_df)
+                if st.button(f"📥 Download {course_display} (CSV)", key=f"download_csv_{course}"):
+                    # TODO: Implement individual CSV download
+                    st.info(f"🚧 Implementation pending: {course_display} CSV")
+
+    # Help section
+    with st.expander("ℹ️ Help & Tips"):
+        st.markdown("""
+        **Export Formats:**
+        - **Excel (XLSX)**: Best for viewing in Excel/Google Sheets, supports multiple sheets
+        - **CSV**: Universal format, opens in any spreadsheet software
+
+        **Export Options:**
+        - **Single file**: All rosters in one file (recommended for archiving)
+        - **Separate files**: One file per class (recommended for sharing individual rosters)
+
+        **Next Steps:**
+        After downloading, you can:
+        1. Share rosters with instructors
+        2. Import into student information systems
+        3. Generate email lists for class communications
+        4. Print for physical records
+        """)
+
+
+def render_communications_tab():
+    """Communications Tab - Telegram Classroom Generation."""
+    st.subheader("📱 Telegram Classroom Setup")
+    st.write("Generate and manage Telegram classroom groups for scheduled courses.")
+    st.caption("💡 Note: Email communications with students will be handled separately.")
+
+    if "rosters" not in st.session_state or not st.session_state["rosters"]:
+        st.warning("⚠️ No rosters available. Please create rosters first.")
+        return
+
+    rosters = st.session_state["rosters"]
+
+    # Load requirements for course title display
+    requirements_df = load_requirements()
+
+    st.info(f"📊 **{len(rosters)}** class(es) ready for Telegram classroom setup")
+
+    st.divider()
+
+    # Telegram Bot Configuration
+    st.write("### 1️⃣ Telegram Bot Configuration")
+    st.caption("Set up your Telegram bot to create and manage classroom groups")
+
+    # Restore telegram_chat_id from cache if available
+    default_chat_id = st.session_state.get("telegram_chat_id", "")
+
+    telegram_chat_id = st.text_input(
+        "Telegram Bot Chat ID",
+        value=default_chat_id,
+        placeholder="@channel_name or -100xxxxx",
+        help="Enter your Telegram bot's chat ID or channel username",
+        key="telegram_chat_id"  # Auto-persists in session_state
+    )
+
+    if telegram_chat_id != default_chat_id:
+        save_current_session()  # Auto-save when changed
+
+    st.divider()
+
+    # Message Template
+    st.write("### 2️⃣ Message Template")
+    st.caption("Customize the welcome message for classroom groups")
+
+    # Restore telegram_draft from cache if available
+    default_draft = st.session_state.get("telegram_draft", "")
+    if not default_draft:
+        default_draft = """📢 **Welcome to {course_name}!**
+
+👥 **Class Information:**
+- Course: {course_code}
+- Time Slot: {time_slot}
+- Students Enrolled: {student_count}
+
+📚 This is your official Telegram classroom for course updates, materials, and discussions.
+
+Please introduce yourself to the group!"""
+
+    telegram_draft = st.text_area(
+        "Message Template",
+        value=default_draft,
+        height=200,
+        help="Use placeholders: {course_name}, {course_code}, {time_slot}, {student_count}",
+        key="telegram_draft"  # Auto-persists in session_state
+    )
+
+    if telegram_draft != default_draft:
+        save_current_session()  # Auto-save when changed
+
+    st.divider()
+
+    # Course Selection for Classroom Creation
+    st.write("### 3️⃣ Create Telegram Classrooms")
+    st.caption("Generate Telegram groups for your scheduled courses")
+
+    # Get schedule information if available
+    schedule = st.session_state.get("offered_courses", {})
+
+    for course, students in rosters.items():
+        course_display = format_course_with_title(course, requirements_df)
+        time_slot = schedule.get(course, "Unassigned")
+
+        with st.expander(f"📖 {course_display} — {len(students)} students", expanded=False):
+            st.write(f"**Time Slot:** {time_slot}")
+            st.write(f"**Enrolled:** {len(students)} students")
+
+            # Preview message
+            preview_message = telegram_draft.format(
+                course_name=course_display,
+                course_code=course,
+                time_slot=time_slot,
+                student_count=len(students)
+            )
+
+            st.write("**Message Preview:**")
+            st.code(preview_message, language=None)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(f"📤 Create Classroom", key=f"create_tg_{course}", use_container_width=True):
+                    if telegram_chat_id:
+                        # TODO: Implement Telegram classroom creation
+                        st.info("🚧 Creating Telegram classroom...")
+                        st.write("Will perform:")
+                        st.write("1. Create Telegram group")
+                        st.write("2. Add students to group")
+                        st.write("3. Send welcome message")
+                        st.write("4. Configure group settings")
+                        save_current_session()  # Auto-save
+                    else:
+                        st.error("⚠️ Please configure Telegram Bot Chat ID first")
+
+            with col2:
+                if st.button(f"📋 View Student List", key=f"view_tg_{course}", use_container_width=True):
+                    if students:
+                        student_df = pd.DataFrame(students)
+                        st.dataframe(student_df[["Name", "Email"]], use_container_width=True)
+
+    st.divider()
+
+    # Help Section
+    with st.expander("ℹ️ How to Set Up Telegram Classrooms"):
+        st.markdown("""
+        **Step-by-Step Guide:**
+
+        1. **Create a Telegram Bot**
+           - Open Telegram and search for @BotFather
+           - Send `/newbot` command and follow instructions
+           - Save the bot token securely
+
+        2. **Configure Bot Settings**
+           - Enter the bot's chat ID in the configuration field above
+           - Customize the welcome message template
+           - Test with one course first
+
+        3. **Create Classrooms**
+           - Click "Create Classroom" for each course
+           - Bot will create a group and add students
+           - Welcome message will be sent automatically
+
+        4. **Manage Classrooms**
+           - Use Telegram to moderate discussions
+           - Share course materials and announcements
+           - Track student engagement
+
+        **Tips:**
+        - Use descriptive group names (e.g., "ENGL-110 Fall 2024")
+        - Set group rules and pinned messages
+        - Enable slow mode for large classes
+        - Assign class monitors as group admins
+        """)
+
+    st.divider()
+
+    st.caption("💾 Changes to Chat ID and Message Template are auto-saved")
 
 
 def student_portal():
