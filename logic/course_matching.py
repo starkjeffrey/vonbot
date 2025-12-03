@@ -166,13 +166,14 @@ def get_bulk_course_history(course_codes: tuple) -> dict:
     normalized_to_original = {normalize_course_code(code): code for code in course_codes}
 
     # Query to get most recent offering for each course
-    # Extract 5th part of ClassId as course code
-    # Filter: Attendance='Normal' AND at least 15 students
+    # Extract course code from ClassId using REPLACE/REVERSE approach
+    # Filter: Attendance='Normal' AND at least 15 students AND Section=87
     query = """
     WITH CourseOfferings AS (
         SELECT
-            -- Extract 5th part of ClassId (course code)
-            PARSENAME(REPLACE(act.ClassId, '!$', '.'), 1) as CourseCode,
+            -- Extract course code (last part after final !$)
+            REVERSE(LEFT(REVERSE(REPLACE(act.ClassId, '!$', '|')),
+                    CHARINDEX('|', REVERSE(REPLACE(act.ClassId, '!$', '|'))) - 1)) as CourseCode,
             t.TermName,
             t.StartDate,
             DATEDIFF(month, t.StartDate, GETDATE()) as MonthsAgo,
@@ -181,8 +182,10 @@ def get_bulk_course_history(course_codes: tuple) -> dict:
         JOIN Terms t ON LEFT(act.ClassId, CHARINDEX('!$', act.ClassId) - 1) = t.TermId
         WHERE CHARINDEX('!$', act.ClassId) > 0
         AND act.Attendance = 'Normal'
+        AND act.Section = 87
         GROUP BY
-            PARSENAME(REPLACE(act.ClassId, '!$', '.'), 1),
+            REVERSE(LEFT(REVERSE(REPLACE(act.ClassId, '!$', '|')),
+                    CHARINDEX('|', REVERSE(REPLACE(act.ClassId, '!$', '|'))) - 1)),
             t.TermName,
             t.StartDate,
             act.ClassId
@@ -350,7 +353,8 @@ def get_course_last_offered(course_code: str):
     query = """
     WITH CourseOfferings AS (
         SELECT
-            PARSENAME(REPLACE(act.ClassId, '!$', '.'), 1) as CourseCode,
+            REVERSE(LEFT(REVERSE(REPLACE(act.ClassId, '!$', '|')),
+                    CHARINDEX('|', REVERSE(REPLACE(act.ClassId, '!$', '|'))) - 1)) as CourseCode,
             t.TermName,
             t.StartDate,
             DATEDIFF(month, t.StartDate, GETDATE()) as MonthsAgo,
@@ -359,8 +363,10 @@ def get_course_last_offered(course_code: str):
         JOIN Terms t ON LEFT(act.ClassId, CHARINDEX('!$', act.ClassId) - 1) = t.TermId
         WHERE CHARINDEX('!$', act.ClassId) > 0
         AND act.Attendance = 'Normal'
+        AND act.Section = 87
         GROUP BY
-            PARSENAME(REPLACE(act.ClassId, '!$', '.'), 1),
+            REVERSE(LEFT(REVERSE(REPLACE(act.ClassId, '!$', '|')),
+                    CHARINDEX('|', REVERSE(REPLACE(act.ClassId, '!$', '|'))) - 1)),
             t.TermName,
             t.StartDate,
             act.ClassId
