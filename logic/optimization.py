@@ -9,8 +9,12 @@ import pandas as pd
 from collections import defaultdict
 
 TIME_SLOTS = [
+    "MW_0800",
+    "MW_0930",
     "MW_1800",
     "MW_1930",
+    "TTh_0800",
+    "TTh_0930",
     "TTh_1800",
     "TTh_1930",
     "Sat_AM",
