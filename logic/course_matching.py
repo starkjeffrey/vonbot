@@ -32,6 +32,39 @@ def load_requirements():
     return pd.DataFrame()
 
 
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def fetch_course_titles_from_db() -> dict:
+    """Fetch course titles directly from the Courses table in the database.
+
+    Returns:
+        dict: Mapping of course_code -> ShortCourseTitle from database
+
+    CACHED: This function queries the database only once per hour.
+    """
+    course_titles = {}
+
+    try:
+        with db_cursor() as cursor:
+            cursor.execute("""
+                SELECT CourseCode, ShortCourseTitle
+                FROM Courses
+                WHERE ShortCourseTitle IS NOT NULL
+                ORDER BY CourseCode
+            """)
+            results = cursor.fetchall()
+
+            for row in results:
+                course_code = row['CourseCode']
+                title = row['ShortCourseTitle']
+                if course_code and title:
+                    course_titles[course_code] = title
+
+    except Exception as e:
+        print(f"Error fetching course titles from database: {e}")
+
+    return course_titles
+
+
 @st.cache_data(ttl=300)  # Cache for 5 minutes
 def get_bulk_transcripts(student_ids: tuple) -> dict:
     """
@@ -80,28 +113,19 @@ def normalize_course_code(code: str) -> str:
 
 
 def get_course_title(course_code: str, requirements_df: pd.DataFrame = None) -> str:
-    """Get the course title for a given course code.
+    """Get the course title for a given course code from the database.
 
     Args:
         course_code: The course code (e.g., 'ACCT-300')
-        requirements_df: Optional pre-loaded requirements DataFrame. If None, will load it.
+        requirements_df: DEPRECATED - kept for backward compatibility but not used
 
     Returns:
-        Course title string, or empty string if not found
+        Course title string from database, or empty string if not found
     """
-    if requirements_df is None:
-        requirements_df = load_requirements()
+    # Fetch course titles from database (cached)
+    course_titles = fetch_course_titles_from_db()
 
-    if requirements_df.empty or 'course_title' not in requirements_df.columns:
-        return ""
-
-    match = requirements_df[requirements_df['course_code'] == course_code]
-    if not match.empty:
-        title = match.iloc[0]['course_title']
-        # Remove quotes if present
-        if isinstance(title, str):
-            return title.strip('"')
-    return ""
+    return course_titles.get(course_code, "")
 
 
 def format_course_with_title(course_code: str, requirements_df: pd.DataFrame = None) -> str:
