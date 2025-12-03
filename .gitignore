@@ -14,3 +14,13 @@ wheels/
 
 # Application cache
 .cache/
+
+# MCP and tool directories
+.claude/
+.serena/
+cache/
+logs/
+
+# IDE settings
+.idea/
+.ruff_cache/

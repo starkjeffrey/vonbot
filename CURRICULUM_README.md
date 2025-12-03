@@ -2,14 +2,16 @@
 
 ## Overview
 
-The `curriculum_requirements.csv` file defines which courses are required for each academic major. This simplified format makes it easy to view and edit course requirements directly.
+The `curriculum_requirements2.csv` file defines which courses are required for each academic major, including course titles for display throughout the application. This simplified tab-separated format makes it easy to view and edit course requirements directly.
 
 ## File Format
 
-```csv
-course_code,BAD,THM,FIN,TES,INT
-ACCT-300,X,,X,,
-ACCT-310,X,X,X,,
+The file uses **tab-separated** format (TSV) with quoted course titles:
+
+```tsv
+course_code	BAD	THM	FIN	TES	INT	course_title
+ACCT-300	X		X			"Intro to Pub Policy & Admin"
+ACCT-310	X	X	X			"English Eff Comm"
 ...
 ```
 
@@ -21,6 +23,7 @@ ACCT-310,X,X,X,,
 - **FIN**: Finance major (mark with `X` if required)
 - **TES**: TESOL major (mark with `X` if required)
 - **INT**: International Relations major (mark with `X` if required)
+- **course_title**: The full course title enclosed in double quotes (e.g., `"Logic & Crit Thinking"`)
 
 ### Major Mappings
 
@@ -45,15 +48,18 @@ ACCT-310,X,X,X,,
 
 ### Adding a New Course
 
-1. Open `curriculum_requirements.csv` in a text editor or spreadsheet program
-2. Add a new row with the course code
+1. Open `curriculum_requirements2.csv` in a text editor or spreadsheet program
+2. Add a new row with the course code, major markers, and course title
 3. Mark with `X` in the columns for majors that require this course
-4. Save the file
+4. Enclose the course title in double quotes
+5. Save the file
 
 Example - adding `NEW-101` required for BAD and FIN:
-```csv
-NEW-101,X,,X,,
+```tsv
+NEW-101	X		X			"Introduction to New Subject"
 ```
+
+**Important**: Course titles MUST be enclosed in double quotes to handle special characters like apostrophes, ampersands, and colons.
 
 ### Removing a Course
 
@@ -78,14 +84,15 @@ MATH-101,X,,X,X,X
 
 ## Editing in Excel/Google Sheets
 
-The CSV can be opened in Excel or Google Sheets for easier editing:
+The TSV file can be opened in Excel or Google Sheets for easier editing:
 
-1. Open the file in your spreadsheet program
+1. Open the file in your spreadsheet program (it will recognize tab-separated format)
 2. Make changes using the grid interface
-3. Export/Save as CSV (not XLSX!)
-4. Ensure the file is saved as `curriculum_requirements.csv`
+3. Ensure course titles remain in quotes
+4. Export/Save as Tab-delimited text (.txt or .tsv)
+5. Rename the file to `curriculum_requirements2.csv`
 
-**Important**: Always save as CSV format, not Excel format (.xlsx)
+**Important**: Always save as tab-separated format, not Excel format (.xlsx) or comma-separated (.csv)
 
 ## How It Works
 
@@ -115,19 +122,20 @@ for major in ['BAD', 'THM', 'FIN', 'TES', 'INT']:
 EOF
 ```
 
-## Backup
-
-The original complex CSV file has been backed up to:
-`curriculum_canonical_requirements_majors_1-6.csv.backup`
-
 ## Migration Notes
 
-This simplified CSV was generated on 2024-11-26 from the original `curriculum_canonical_requirements_majors_1-6.csv` which contained:
-- 217 rows with extensive metadata
-- Multiple redundant columns (sequence_number, description, is_active, notes, effective_term_id, end_term_id, required_course_id)
-- Complex parsing requirements
+**Version 2.0** (curriculum_requirements2.csv) - Current format with course titles:
+- Tab-separated format for better handling of special characters
+- Added course_title column for display throughout the application
+- Quoted course titles to handle apostrophes, ampersands, slashes, and colons
+- Generated from Version 1.0 with course titles added
 
-The simplified version contains only the essential data needed for course matching.
+**Version 1.0** (curriculum_requirements.csv) - Obsolete:
+- Comma-separated format
+- No course titles
+- Generated on 2024-11-26 from original `curriculum_canonical_requirements_majors_1-6.csv`
+
+The original complex CSV contained 217 rows with extensive metadata, multiple redundant columns (sequence_number, description, is_active, notes, effective_term_id, end_term_id, required_course_id), and complex parsing requirements.
 
 ## Common Courses
 
