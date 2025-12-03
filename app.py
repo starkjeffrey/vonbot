@@ -788,12 +788,16 @@ def render_schedule_optimization_tab():
     st.write(f"You have created **{len(active_classes)}** active classes.")
 
     # Lazy import
-    from logic.optimization import TIME_SLOTS, check_roster_conflicts
-    
+    from logic.optimization import TIME_SLOTS, TIME_SLOT_LABELS, get_time_slot_label, check_roster_conflicts
+
     # Load requirements for course title display
     requirements_df = load_requirements()
 
     offered_courses = {}
+
+    # Create display labels for selectbox (label -> code mapping)
+    slot_display_to_code = {get_time_slot_label(slot): slot for slot in TIME_SLOTS}
+    slot_options = ["Unassigned"] + [get_time_slot_label(slot) for slot in TIME_SLOTS]
 
     # Create a grid layout for slot assignment
     cols = st.columns(3)
@@ -801,13 +805,23 @@ def render_schedule_optimization_tab():
         with cols[i % 3]:
             student_count = len(rosters.get(course, []))
             course_display = format_course_with_title(course, requirements_df)
-            slot = st.selectbox(
+
+            # Get the current slot for this course (if previously assigned)
+            current_slot_code = st.session_state.get("offered_courses", {}).get(course, "Unassigned")
+            current_slot_display = get_time_slot_label(current_slot_code) if current_slot_code != "Unassigned" else "Unassigned"
+            current_index = slot_options.index(current_slot_display) if current_slot_display in slot_options else 0
+
+            slot_display = st.selectbox(
                 f"{course_display} ({student_count} students)",
-                options=["Unassigned"] + TIME_SLOTS,
+                options=slot_options,
+                index=current_index,
                 key=f"slot_{course}",
             )
-            if slot != "Unassigned":
-                offered_courses[course] = slot
+
+            # Convert display label back to code
+            if slot_display != "Unassigned":
+                slot_code = slot_display_to_code[slot_display]
+                offered_courses[course] = slot_code
 
     st.divider()
 
@@ -904,6 +918,9 @@ def render_download_rosters_tab():
 
     st.divider()
 
+    # Import time slot label function
+    from logic.optimization import get_time_slot_label as get_slot_label
+
     # Preview section
     with st.expander("👁️ Preview Roster Data", expanded=False):
         st.caption("Showing first few rows of the export data:")
@@ -913,7 +930,8 @@ def render_download_rosters_tab():
         count = 0
         for course, students in rosters.items():
             course_display = format_course_with_title(course, requirements_df)
-            time_slot = schedule.get(course, "Unassigned")
+            time_slot_code = schedule.get(course, "Unassigned")
+            time_slot = get_slot_label(time_slot_code) if time_slot_code != "Unassigned" else "Unassigned"
 
             for student in students:
                 if count >= 10:
@@ -972,11 +990,15 @@ def render_download_rosters_tab():
 
     st.divider()
 
+    # Import time slot label function
+    from logic.optimization import get_time_slot_label
+
     # Generate export data
     export_rows = []
     for course, students in rosters.items():
         course_title = get_course_title(course, requirements_df)
-        time_slot = schedule.get(course, "Unassigned")
+        time_slot_code = schedule.get(course, "Unassigned")
+        time_slot = get_time_slot_label(time_slot_code) if time_slot_code != "Unassigned" else "Unassigned"
 
         for student in students:
             student_id = student["StudentId"]
@@ -1179,9 +1201,13 @@ Please introduce yourself to the group!"""
     # Get schedule information if available
     schedule = st.session_state.get("offered_courses", {})
 
+    # Import time slot label function
+    from logic.optimization import get_time_slot_label
+
     for course, students in rosters.items():
         course_display = format_course_with_title(course, requirements_df)
-        time_slot = schedule.get(course, "Unassigned")
+        time_slot_code = schedule.get(course, "Unassigned")
+        time_slot = get_time_slot_label(time_slot_code) if time_slot_code != "Unassigned" else "Unassigned"
 
         with st.expander(f"📖 {course_display} — {len(students)} students", expanded=False):
             st.write(f"**Time Slot:** {time_slot}")
