@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import course display helpers
-from logic.course_matching import load_requirements, format_course_with_title
+from logic.course_matching import load_requirements, format_course_with_title, get_course_title
 
 st.set_page_config(
     page_title="Academic Scheduling Tool",
