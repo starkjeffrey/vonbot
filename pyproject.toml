@@ -20,3 +20,8 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 include = ["logic", "models", "database", "services"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.1",
+]
