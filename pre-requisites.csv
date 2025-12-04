@@ -1,35 +1,36 @@
-﻿Order,Course Code,Short Name
-1,ENGL-110,College English I
-2,ENGL-120,College English II
-1,MATH-101,College Algebra
-2,STAT-105/THM-331,Introduction to Statistics/Statistic for Tourism
-1,ECON-101/ECON-310A/THM-314,Introduction to Economics & Entrepreneurships/Tourism Economics
-2,ECON-211,Microeconomic Principles
-3,ECON-212,Macroeconomic Principles
-1,ACCT-310,Accounting I
-2,ACCT-312,Accounting II
-3,ACCT-313,Accounting III
-4,ACCT-300,Cost Accounting I
-1,FIN-299,Financial Management I/Hospitality Accounting & Financial Management
-2,FIN-420,Financial Management II/Hospitality Management & Cost Analysis
-1,THM-332,Financial Management I/Hospitality Accounting & Financial Management
-2,THM-414,Financial Management II/Hospitality Management & Cost Analysis
-1,ENGL-303,English Syntax
-2,ENGL-301,Advanced Grammar
-1,ENGL-306,Introduction to Literature
-2,LIT-325,Comparative Literature
-1,EDUC-400,Introduction to TESOL
-2,EDUC-403,Methodology in TESOL II
-3,EDUC-407,Seminar in TESOL
-1,LAW-301,Introduction to Law
-2,LAW-304,International Law
-1,ARIL-210,Academic Research: Information Literacy
-2,ENGL-201A,Writing Development
-3,ENGL-302A,Advanced Writing
-,,
-1,ARIL-210,Academic Research: Information Literacy
-2,ENGL-311,Technical Writing for Business
-,,
-1,ARIL-210,Academic Research: Information Literacy
-2,SOC-429,Research Methods in Social Science
-2,THM-421,Research Methods in Hospitality & Tourism
+ChainID,Order,CourseCode,ShortName
+a,1,ACCT-310,Accounting I
+a,2,ACCT-312,Accounting II
+a,3,ACCT-313,Accounting III
+a,4,ACCT-300,Cost Accounting I
+b,1,ARIL-210,Academic Research: Information Literacy
+b,2,ENGL-201A,Writing Development
+b,3,ENGL-302A,Advanced Writing
+c,1,ARIL-210,Academic Research: Information Literacy
+c,2,ENGL-311,Technical Writing for Business
+d,1,ARIL-210,Academic Research: Information Literacy
+d,2,SOC-429,Research Methods in Social Science
+e,1,ARIL-210,Academic Research: Information Literacy
+e,2,THM-421,Research Methods in Hospitality & Tourism
+f,1,ECON-101,Introduction to Economics
+f,2,ECON-211,Microeconomic Principles
+f,3,ECON-212,Macroeconomic Principles
+g,1,EDUC-400,Introduction to TESOL
+g,2,EDUC-403,Methodology in TESOL II
+g,3,EDUC-407,Seminar in TESOL
+h,1,ENGL-110,College English I
+h,2,ENGL-120,College English II
+i,1,ENGL-303,English Syntax
+i,2,ENGL-301,Advanced Grammar
+j,1,ENGL-306,Introduction to Literature
+j,2,LIT-325,Comparative Literature
+k,1,FIN-299,Financial Management I
+k,2,FIN-420,Financial Management II
+l,1,LAW-301,Introduction to Law
+l,2,LAW-304,International Law
+m,1,MATH-101,College Algebra
+m,2,STAT-105,Introduction to Statistics
+n,1,MATH-101,College Algebra
+n,2,THM-331,Statistics for Tourism
+o,1,THM-332,Hospitality Accounting & Financial Management
+o,2,THM-414,Hospitality Management & Cost Analysis
