@@ -171,6 +171,60 @@ def main():
                 st.info("Cache cleared")
                 st.rerun()
 
+        st.divider()
+        st.header("📸 Backup Snapshots")
+
+        # Import backup functions
+        from logic.cache import create_backup, list_backups, restore_backup, delete_backup
+
+        # List available backups
+        backups = list_backups()
+
+        if backups:
+            st.caption(f"{len(backups)} snapshot(s) available")
+            
+            # Select a backup to restore
+            backup_options = {b["timestamp"]: b["filename"] for b in backups}
+            selected_time = st.selectbox(
+                "Select snapshot",
+                options=list(backup_options.keys()),
+                key="backup_select",
+                label_visibility="collapsed"
+            )
+            
+            if selected_time:
+                selected_backup = backup_options[selected_time]
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    if st.button("📸 Snapshot", key="create_backup", help="Create new backup snapshot"):
+                        create_backup(st.session_state)
+                        st.success("Backup created!")
+                        st.rerun()
+                with col2:
+                    if st.button("↩️ Restore", key="restore_backup", help="Restore from selected snapshot"):
+                        restored_data = restore_backup(selected_backup)
+                        if restored_data:
+                            for key, value in restored_data.items():
+                                if key != "saved_at" and value is not None:
+                                    st.session_state[key] = value
+                            save_current_session()  # Save restored data to current cache
+                            st.success(f"Restored from {selected_time}")
+                            st.rerun()
+                        else:
+                            st.error("Failed to restore backup")
+                with col3:
+                    if st.button("🗑️ Delete", key="delete_backup", help="Delete selected snapshot"):
+                        delete_backup(selected_backup)
+                        st.info("Backup deleted")
+                        st.rerun()
+        else:
+            st.caption("No backups yet")
+            if st.button("📸 Create First Snapshot", key="create_first_backup", use_container_width=True):
+                create_backup(st.session_state)
+                st.success("First backup created!")
+                st.rerun()
+
     if app_mode == "Admin Dashboard":
         admin_dashboard()
     elif app_mode == "Student Portal":

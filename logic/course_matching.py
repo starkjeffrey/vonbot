@@ -33,6 +33,16 @@ def load_requirements():
 
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
+def load_prerequisites_data():
+    """Load prerequisite chains from CSV.
+
+    CACHED: This function reads from disk only once per hour.
+    """
+    from logic.prerequisites import load_prerequisites
+    return load_prerequisites()
+
+
+@st.cache_data(ttl=3600)  # Cache for 1 hour
 def fetch_course_titles_from_db() -> dict:
     """Fetch course titles directly from the Courses table in the database.
 
@@ -245,21 +255,26 @@ def get_bulk_course_history(course_codes: tuple) -> dict:
 
 def get_student_requirements_fast(student_id: str, major_code: str,
                                    requirements_df: pd.DataFrame,
-                                   transcripts: dict) -> list:
+                                   transcripts: dict,
+                                   prereq_data: dict = None) -> list:
     """
     Get list of courses required for the student's major that they haven't taken.
 
     OPTIMIZATION: Uses pre-loaded requirements and bulk-fetched transcripts
     instead of making database calls.
 
+    PREREQUISITE FILTERING: Only returns courses the student is eligible for
+    based on prerequisite chains.
+
     Args:
         student_id: Student ID
         major_code: Student's BatchIDForDoctor (e.g., 'TES-53E')
         requirements_df: Pre-loaded requirements DataFrame
         transcripts: Pre-fetched dict of {student_id: [courses taken]}
+        prereq_data: Optional prerequisite data for filtering
 
     Returns:
-        list: List of required course codes the student still needs
+        list: List of required course codes the student still needs AND is eligible for
     """
     if requirements_df.empty:
         return []
@@ -281,6 +296,11 @@ def get_student_requirements_fast(student_id: str, major_code: str,
 
     # Find missing courses
     missing_courses = [code for code in required_codes if code not in taken_courses]
+
+    # Apply prerequisite filtering if available
+    if prereq_data:
+        from logic.prerequisites import get_eligible_courses
+        missing_courses = get_eligible_courses(taken_courses, missing_courses, prereq_data)
 
     return missing_courses
 
@@ -404,6 +424,7 @@ def generate_needs_matrix(students_df: pd.DataFrame, progress_callback=None):
     Generate a matrix of students and their required courses.
 
     OPTIMIZED: Uses bulk transcript fetching instead of N individual queries.
+    PREREQUISITE FILTERING: Only includes courses students are eligible for.
 
     Args:
         students_df (pd.DataFrame): DataFrame of active students.
@@ -417,6 +438,9 @@ def generate_needs_matrix(students_df: pd.DataFrame, progress_callback=None):
 
     # Pre-load requirements (cached)
     requirements_df = load_requirements()
+
+    # Pre-load prerequisites (cached)
+    prereq_data = load_prerequisites_data()
 
     # OPTIMIZATION: Bulk fetch all transcripts in ONE query
     student_ids = tuple(students_df["StudentId"].tolist())
@@ -433,9 +457,9 @@ def generate_needs_matrix(students_df: pd.DataFrame, progress_callback=None):
         if progress_callback:
             progress_callback(i + 1, total_students, student_name)
 
-        # Use fast version with pre-loaded data
+        # Use fast version with pre-loaded data and prerequisite filtering
         missing_courses = get_student_requirements_fast(
-            student_id, major_code, requirements_df, transcripts
+            student_id, major_code, requirements_df, transcripts, prereq_data
         )
 
         student_data = {
@@ -520,6 +544,7 @@ def compute_demand_summary(_df_hash: str, needs_df: pd.DataFrame) -> pd.DataFram
 def clear_course_cache():
     """Clear all course-related caches. Call when data needs refreshing."""
     load_requirements.clear()
+    load_prerequisites_data.clear()
     get_bulk_transcripts.clear()
     get_bulk_course_history.clear()
     compute_demand_summary.clear()
