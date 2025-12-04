@@ -242,6 +242,7 @@ def admin_dashboard():
         "Schedule Optimization",
         "Download Rosters",
         "Communications",
+        "Student Transcript",
     ])
 
     with tabs[0]:
@@ -264,6 +265,9 @@ def admin_dashboard():
 
     with tabs[6]:
         render_communications_tab()
+
+    with tabs[7]:
+        render_student_transcript_tab()
 
 
 def render_student_selection_tab():
@@ -1336,6 +1340,68 @@ Please introduce yourself to the group!"""
     st.divider()
 
     st.caption("💾 Changes to Chat ID and Message Template are auto-saved")
+
+
+def render_student_transcript_tab():
+    """Student Transcript Tab - Quick transcript lookup."""
+    st.subheader("🎓 Student Transcript Lookup")
+    st.write("Enter a student ID to view their complete transcript from the database.")
+
+    # Input for student ID
+    student_id = st.text_input(
+        "Student ID",
+        placeholder="Enter student ID...",
+        help="Enter the student ID to query their transcript"
+    )
+
+    if student_id:
+        if st.button("🔍 Lookup Transcript", type="primary"):
+            with st.spinner(f"Fetching transcript for {student_id}..."):
+                from database.connection import db_cursor
+
+                # Query vw_BAlatestgrade for this student
+                query = """
+                SELECT *
+                FROM vw_BAlatestgrade
+                WHERE id = %s
+                """
+
+                try:
+                    with db_cursor() as cursor:
+                        cursor.execute(query, (student_id,))
+                        results = cursor.fetchall()
+
+                        if results:
+                            # Convert to DataFrame for display
+                            transcript_df = pd.DataFrame(results)
+
+                            st.success(f"Found {len(transcript_df)} course record(s) for student {student_id}")
+
+                            # Display the transcript
+                            st.dataframe(
+                                transcript_df,
+                                use_container_width=True,
+                                hide_index=True,
+                                height=min(len(transcript_df) * 35 + 38, 600)
+                            )
+
+                            # Download option
+                            csv = transcript_df.to_csv(index=False).encode("utf-8")
+                            st.download_button(
+                                label="📥 Download Transcript (CSV)",
+                                data=csv,
+                                file_name=f"transcript_{student_id}.csv",
+                                mime="text/csv",
+                            )
+                        else:
+                            st.warning(f"No transcript records found for student ID: {student_id}")
+
+                except Exception as e:
+                    st.error(f"Error fetching transcript: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
+    else:
+        st.info("👆 Enter a student ID above to view their transcript")
 
 
 def student_portal():
