@@ -495,81 +495,86 @@ def render_class_rosters_tab():
         st.info(
             f"Managing Roster for **{selected_course}** - Currently {len(current_roster)} students assigned.")
 
-        # Filter Eligible Students
-        eligible_students = needs_df[needs_df[selected_course] == 1].copy()
-        
-        # Extract major prefix for filtering (e.g., "TES-53E" -> "TES")
-        eligible_students["MajorPrefix"] = eligible_students["Major"].apply(
-            lambda x: x.split("-")[0] if "-" in str(x) else str(x)[:3]
-        )
-
-        # Filter by Major (applied first)
-        st.write("**Filter by Major:**")
-        selected_major = st.radio(
-            "Select Major",
-            options=["All", "BUS", "TES", "INT", "TOU", "FIN"],
-            horizontal=True,
-            label_visibility="collapsed"
-        )
-        
-        if selected_major != "All":
-            # Map display names to actual prefixes
-            major_mapping = {
-                "BUS": "BAD",  # Business Administration
-                "TES": "TES",  # TESOL
-                "INT": "INT",  # International Relations
-                "TOU": "THM",  # Tourism and Hospitality Management
-                "FIN": "FIN"   # Finance
-            }
-            actual_prefix = major_mapping.get(selected_major, selected_major)
-            filtered_students = eligible_students[
-                eligible_students["MajorPrefix"] == actual_prefix
-            ]
+        # Check if course has any students needing it
+        if selected_course not in needs_df.columns:
+            st.info(f"**0 students require this course** ({selected_course})")
+            st.write("This course is not needed by any current students based on their transcripts and degree requirements.")
         else:
-            filtered_students = eligible_students
-        
-        # Filter by Cohort (applied second, after major filter)
-        cohorts = sorted(filtered_students["Cohort"].unique().tolist())
-        selected_cohort = st.selectbox("Filter by Cohort", ["All"] + cohorts)
+            # Filter Eligible Students
+            eligible_students = needs_df[needs_df[selected_course] == 1].copy()
 
-        if selected_cohort != "All":
-            filtered_students = filtered_students[
-                filtered_students["Cohort"] == selected_cohort]
+            # Extract major prefix for filtering (e.g., "TES-53E" -> "TES")
+            eligible_students["MajorPrefix"] = eligible_students["Major"].apply(
+                lambda x: x.split("-")[0] if "-" in str(x) else str(x)[:3]
+            )
 
-        # Display Interactive Table
-        st.write("### Select Students to Assign")
+            # Filter by Major (applied first)
+            st.write("**Filter by Major:**")
+            selected_major = st.radio(
+                "Select Major",
+                options=["All", "BUS", "TES", "INT", "TOU", "FIN"],
+                horizontal=True,
+                label_visibility="collapsed"
+            )
 
-        display_df = filtered_students[
-            ["StudentId", "Name", "Major", "Cohort", "Email"]]
+            if selected_major != "All":
+                # Map display names to actual prefixes
+                major_mapping = {
+                    "BUS": "BAD",  # Business Administration
+                    "TES": "TES",  # TESOL
+                    "INT": "INT",  # International Relations
+                    "TOU": "THM",  # Tourism and Hospitality Management
+                    "FIN": "FIN"   # Finance
+                }
+                actual_prefix = major_mapping.get(selected_major, selected_major)
+                filtered_students = eligible_students[
+                    eligible_students["MajorPrefix"] == actual_prefix
+                ]
+            else:
+                filtered_students = eligible_students
 
-        event = st.dataframe(
-            display_df,
-            on_select="rerun",
-            selection_mode="multi-row",
-            use_container_width=True,
-            hide_index=True,
-        )
+            # Filter by Cohort (applied second, after major filter)
+            cohorts = sorted(filtered_students["Cohort"].unique().tolist())
+            selected_cohort = st.selectbox("Filter by Cohort", ["All"] + cohorts)
 
-        # Assign Button
-        if event.selection.rows:
-            selected_indices = event.selection.rows
-            selected_rows = display_df.iloc[selected_indices]
+            if selected_cohort != "All":
+                filtered_students = filtered_students[
+                    filtered_students["Cohort"] == selected_cohort]
 
-            if st.button(f"Assign {len(selected_rows)} Students to Roster"):
-                new_students = []
-                current_ids = [s["StudentId"] for s in current_roster]
+            # Display Interactive Table
+            st.write("### Select Students to Assign")
 
-                for _, row in selected_rows.iterrows():
-                    student_entry = row.to_dict()
-                    if student_entry["StudentId"] not in current_ids:
-                        new_students.append(student_entry)
+            display_df = filtered_students[
+                ["StudentId", "Name", "Major", "Cohort", "Email"]]
 
-                st.session_state["rosters"][
-                    selected_course] = current_roster + new_students
-                save_current_session()  # Auto-save
-                st.success(
-                    f"Added {len(new_students)} students to {selected_course} roster!")
-                st.rerun()
+            event = st.dataframe(
+                display_df,
+                on_select="rerun",
+                selection_mode="multi-row",
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            # Assign Button
+            if event.selection.rows:
+                selected_indices = event.selection.rows
+                selected_rows = display_df.iloc[selected_indices]
+
+                if st.button(f"Assign {len(selected_rows)} Students to Roster"):
+                    new_students = []
+                    current_ids = [s["StudentId"] for s in current_roster]
+
+                    for _, row in selected_rows.iterrows():
+                        student_entry = row.to_dict()
+                        if student_entry["StudentId"] not in current_ids:
+                            new_students.append(student_entry)
+
+                    st.session_state["rosters"][
+                        selected_course] = current_roster + new_students
+                    save_current_session()  # Auto-save
+                    st.success(
+                        f"Added {len(new_students)} students to {selected_course} roster!")
+                    st.rerun()
 
         # View Current Roster
         st.divider()
