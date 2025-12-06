@@ -478,17 +478,11 @@ def render_class_rosters_tab():
     if "rosters" not in st.session_state:
         st.session_state["rosters"] = {}
 
-    # Get course options from demand list or needs matrix
-    if "demand_df" in st.session_state and not st.session_state["demand_df"].empty:
-        demand_df = st.session_state["demand_df"]
-        course_options = demand_df.sort_values(by="Demand", ascending=False)[
-            "Course"].tolist()
-    else:
-        metadata_cols = ["StudentId", "Name", "Email", "Major", "Cohort", "LastEnroll"]
-        course_options = [c for c in needs_df.columns if c not in metadata_cols]
-
     # Load requirements for course title display
     requirements_df = load_requirements()
+
+    # Get ALL course options from curriculum (not just ones in needs matrix)
+    course_options = sorted(requirements_df["course_code"].unique().tolist())
     
     selected_course = st.selectbox(
         "Select Course to Create/Manage",
